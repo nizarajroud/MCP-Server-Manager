@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/aws/amazon-q-developer-cli/refs/heads/main/schemas/agent-v1.json",
+  "name": "experiment",
+  "description": "",
+  "prompt": null,
+  "mcpServers": {
+    "test-server": {
+      "command": "uvx",
+      "args": ["test"],
+      "env": {}
+    }
+  }
+}
