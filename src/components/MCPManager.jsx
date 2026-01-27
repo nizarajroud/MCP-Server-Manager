@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Download, Upload, Globe, Settings, CheckSquare, Square, Trash2, Plus, Save, FolderOpen } from 'lucide-react';
+import { Database, Download, Upload, Globe, Settings, CheckSquare, Square, Trash2, Plus, Save, FolderOpen, Edit } from 'lucide-react';
 import '../utils/storage';
 
 const MCPManager = () => {
@@ -12,10 +12,25 @@ const MCPManager = () => {
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const [agentFilter, setAgentFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedConfig, setEditedConfig] = useState('');
+  const [agentFilePath, setAgentFilePath] = useState('');
 
   useEffect(() => {
     loadServers();
   }, []);
+
+  useEffect(() => {
+    if (selectedServers.size === 0) {
+      setAgentFilePath('');
+    } else {
+      const selectedServerIds = Array.from(selectedServers);
+      const firstSelectedServer = servers.find(s => s.id === selectedServerIds[0]);
+      if (firstSelectedServer && firstSelectedServer.agentPath) {
+        setAgentFilePath(firstSelectedServer.agentPath);
+      }
+    }
+  }, [selectedServers, servers]);
 
   const loadServers = async () => {
     try {
@@ -94,6 +109,51 @@ const MCPManager = () => {
     showNotification('Configuration téléchargée avec succès!');
   };
 
+  const saveConfig = async () => {
+    try {
+      const mcpServers = {};
+      const trimmed = editedConfig.trim();
+      
+      // Parse multiple server entries separated by commas
+      const serverEntries = trimmed.split(/,\n(?=")/);
+      
+      for (const entry of serverEntries) {
+        const match = entry.trim().match(/^"([^"]+)":\s*(\{[\s\S]*\})$/);
+        if (match) {
+          const [, name, configStr] = match;
+          mcpServers[name] = JSON.parse(configStr);
+        }
+      }
+      
+      if (Object.keys(mcpServers).length === 0) {
+        throw new Error('Aucun serveur valide trouvé');
+      }
+      
+      const config = { mcpServers };
+      const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'claude_desktop_config.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      setIsEditing(false);
+      showNotification('Configuration sauvegardée avec succès!');
+    } catch (error) {
+      showNotification('Erreur: JSON invalide', 'error');
+    }
+  };
+
+  const startEditing = () => {
+    const mcpServers = generateConfig().mcpServers;
+    const entries = Object.entries(mcpServers);
+    const formatted = entries.map(([name, config]) => 
+      `"${name}": ${JSON.stringify(config, null, 2)}`
+    ).join(',\n');
+    setEditedConfig(formatted);
+    setIsEditing(true);
+  };
+
   const importFromJson = async (jsonContent) => {
     try {
       const content = jsonContent || importJson;
@@ -124,7 +184,8 @@ const MCPManager = () => {
             command: config.command,
             args: config.args || [],
             env: config.env || {},
-            agent: agentName
+            agent: agentName,
+            agentPath: agentFilePath
           };
           await window.storage.set(serverId, JSON.stringify(serverData));
           imported++;
@@ -132,6 +193,7 @@ const MCPManager = () => {
       }
       await loadServers();
       setImportJson('');
+      setAgentFilePath('');
       showNotification(`${imported} serveur(s) importé(s) avec succès!`);
     } catch (error) {
       console.error('Import error:', error);
@@ -237,7 +299,7 @@ const MCPManager = () => {
           </div>
         )}
 
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-2">
           <button
             onClick={() => setActiveTab('manage')}
             className={`px-6 py-3 rounded-lg flex items-center gap-2 transition ${activeTab === 'manage' ? 'bg-purple-600' : 'bg-slate-700 hover:bg-slate-600'}`}
@@ -261,6 +323,10 @@ const MCPManager = () => {
           </button>
         </div>
 
+        <div className="mb-6 text-slate-300 text-sm">
+          <span className="font-medium">Chemin par défaut des agents Kiro - Niveau global:</span> {import.meta.env.VITE_DEFAULT_PATH || '/home/nizar/.kiro/agents/'}
+        </div>
+
         {activeTab === 'manage' && (
           <div className="space-y-6">
             <div className="bg-slate-800/50 backdrop-blur rounded-lg p-6 border border-slate-700">
@@ -279,7 +345,7 @@ const MCPManager = () => {
                     onChange={(e) => setAgentFilter(e.target.value)}
                     className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition border border-slate-600 focus:border-purple-500 focus:outline-none"
                   >
-                    <option value="all">Tous les agents</option>
+                    <option value="all">Tous les agents Kiro</option>
                     {[...new Set(servers.map(s => s.agent).filter(Boolean))].map(agent => (
                       <option key={agent} value={agent}>{agent}</option>
                     ))}
@@ -370,35 +436,55 @@ const MCPManager = () => {
               </div>
             </div>
 
+            {agentFilePath && (
+              <div className="bg-slate-800/50 backdrop-blur rounded-lg p-6 border border-slate-700">
+                <h2 className="text-xl font-semibold mb-2">Chemin de l'agent</h2>
+                <p className="text-slate-300 text-sm break-all">{agentFilePath}</p>
+              </div>
+            )}
+
             <div className="bg-slate-800/50 backdrop-blur rounded-lg p-6 border border-slate-700">
-              <h2 className="text-2xl font-semibold mb-4">Configuration de sortie</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Chemin de sortie</label>
-                  <input
-                    type="text"
-                    value={outputPath}
-                    onChange={(e) => setOutputPath(e.target.value)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 focus:border-purple-500 focus:outline-none"
-                    placeholder="~/claude_desktop_config.json"
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-semibold">Configuration de serveur MCP</h2>
+                <div className="flex gap-2">
+                  {!isEditing ? (
+                    <button
+                      onClick={startEditing}
+                      disabled={selectedServers.size === 0}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Edit size={18} />
+                      Éditer
+                    </button>
+                  ) : (
+                    <button
+                      onClick={saveConfig}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition flex items-center gap-2"
+                    >
+                      <Save size={18} />
+                      Sauvegarder
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="bg-slate-900/50 p-4 rounded-lg">
+                {isEditing ? (
+                  <textarea
+                    value={editedConfig}
+                    onChange={(e) => setEditedConfig(e.target.value)}
+                    className="w-full h-96 bg-slate-800 text-slate-300 text-xs font-mono p-4 rounded border border-slate-600 focus:border-purple-500 focus:outline-none"
                   />
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={downloadConfig}
-                    disabled={selectedServers.size === 0}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
-                  >
-                    <Download size={20} />
-                    Télécharger la configuration ({selectedServers.size} serveurs)
-                  </button>
-                </div>
-                <div className="bg-slate-900/50 p-4 rounded-lg">
-                  <p className="text-xs text-slate-400 mb-2">Aperçu de la configuration:</p>
-                  <pre className="text-xs text-slate-300 overflow-x-auto">
-                    {JSON.stringify(generateConfig(), null, 2)}
+                ) : (
+                  <pre className="text-xs text-slate-300 overflow-x-auto max-h-96 overflow-y-auto">
+                    {(() => {
+                      const mcpServers = generateConfig().mcpServers;
+                      const entries = Object.entries(mcpServers);
+                      return entries.map(([name, config]) => 
+                        `"${name}": ${JSON.stringify(config, null, 2)}`
+                      ).join(',\n');
+                    })()}
                   </pre>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -416,6 +502,8 @@ const MCPManager = () => {
                   onChange={(e) => {
                     const file = e.target.files[0];
                     if (file) {
+                      const defaultPath = import.meta.env.VITE_DEFAULT_PATH || '/home/nizar/.kiro/agents/';
+                      setAgentFilePath(defaultPath + file.name);
                       const reader = new FileReader();
                       reader.onload = (event) => {
                         setImportJson(event.target.result);
