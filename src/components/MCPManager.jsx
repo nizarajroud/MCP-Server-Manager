@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Download, Upload, Globe, Settings, CheckSquare, Square, Trash2, Plus, Save, FolderOpen, Edit } from 'lucide-react';
+import { Database, Download, Upload, Globe, Settings, CheckSquare, Square, Trash2, Plus, Save, FolderOpen, Edit, Power, PowerOff } from 'lucide-react';
 import '../utils/storage';
 
 const MCPManager = () => {
@@ -32,6 +32,11 @@ const MCPManager = () => {
     }
   }, [selectedServers, servers]);
 
+  useEffect(() => {
+    // Réinitialiser la sélection quand on change d'agent
+    setSelectedServers(new Set());
+  }, [agentFilter]);
+
   const loadServers = async () => {
     try {
       const keys = await window.storage.list('mcp_server:');
@@ -58,6 +63,38 @@ const MCPManager = () => {
     setTimeout(() => setNotification({ show: false, message: '', type: 'success' }), 3000);
   };
 
+  const migrateAgentPaths = async () => {
+    try {
+      const keys = await window.storage.list('mcp_server:');
+      
+      if (!keys || !keys.keys) {
+        showNotification('Aucun serveur trouvé', 'error');
+        return;
+      }
+      
+      let updated = 0;
+      
+      for (const key of keys.keys) {
+        const result = await window.storage.get(key);
+        if (result) {
+          const server = JSON.parse(result.value);
+          
+          // Si le serveur n'a pas d'agentPath, l'ajouter
+          if (!server.agentPath && server.agent) {
+            server.agentPath = `/home/nizar/.kiro/agents/${server.agent}.json`;
+            await window.storage.set(key, JSON.stringify(server));
+            updated++;
+          }
+        }
+      }
+      
+      await loadServers();
+      showNotification(`${updated} serveur(s) mis à jour avec agentPath`);
+    } catch (error) {
+      showNotification(`Erreur: ${error.message}`, 'error');
+    }
+  };
+
   const toggleServer = (serverId) => {
     const newSelected = new Set(selectedServers);
     if (newSelected.has(serverId)) {
@@ -69,11 +106,20 @@ const MCPManager = () => {
   };
 
   const toggleAll = () => {
-    const filteredServers = servers.filter(s => (agentFilter === 'all' || s.agent === agentFilter) && (searchQuery === '' || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.command.toLowerCase().includes(searchQuery.toLowerCase())));
-    if (selectedServers.size === filteredServers.length && filteredServers.every(s => selectedServers.has(s.id))) {
-      filteredServers.forEach(s => selectedServers.delete(s.id));
-      setSelectedServers(new Set(selectedServers));
+    const filteredServers = servers.filter(s => 
+      (agentFilter === 'all' || s.agent === agentFilter) && 
+      (searchQuery === '' || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.command.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+    
+    const allSelected = filteredServers.length > 0 && filteredServers.every(s => selectedServers.has(s.id));
+    
+    if (allSelected) {
+      // Tout désélectionner
+      const newSelected = new Set(selectedServers);
+      filteredServers.forEach(s => newSelected.delete(s.id));
+      setSelectedServers(newSelected);
     } else {
+      // Tout sélectionner
       const newSelected = new Set(selectedServers);
       filteredServers.forEach(s => newSelected.add(s.id));
       setSelectedServers(newSelected);
@@ -84,11 +130,19 @@ const MCPManager = () => {
     const mcpServers = {};
     servers.forEach(server => {
       if (selectedServers.has(server.id)) {
-        mcpServers[server.name] = {
+        const config = {
           command: server.command,
           args: server.args || [],
           env: server.env || {}
         };
+        
+        // Ajouter les champs optionnels s'ils existent
+        if (server.autoApprove !== undefined) config.autoApprove = server.autoApprove;
+        if (server.disabled !== undefined) config.disabled = server.disabled;
+        if (server.timeout !== undefined) config.timeout = server.timeout;
+        if (server.transport !== undefined) config.transport = server.transport;
+        
+        mcpServers[server.name] = config;
       }
     });
 
@@ -114,6 +168,9 @@ const MCPManager = () => {
       const mcpServers = {};
       const trimmed = editedConfig.trim();
       
+      console.log('=== SAVE CONFIG START ===');
+      console.log('Edited config:', trimmed);
+      
       // Parse multiple server entries separated by commas
       const serverEntries = trimmed.split(/,\n(?=")/);
       
@@ -125,22 +182,110 @@ const MCPManager = () => {
         }
       }
       
+      console.log('Parsed mcpServers:', mcpServers);
+      console.log('All servers:', servers);
+      
       if (Object.keys(mcpServers).length === 0) {
         throw new Error('Aucun serveur valide trouvé');
       }
       
-      const config = { mcpServers };
-      const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'claude_desktop_config.json';
-      a.click();
-      URL.revokeObjectURL(url);
+      // Mettre à jour le storage local
+      const selectedServerIds = Array.from(selectedServers);
+      console.log('Selected server IDs:', selectedServerIds);
+      
+      for (const serverId of selectedServerIds) {
+        const server = servers.find(s => s.id === serverId);
+        console.log('Processing server:', server);
+        if (server && mcpServers[server.name]) {
+          const editedConfig = mcpServers[server.name];
+          const updatedServer = {
+            ...server,
+            command: editedConfig.command,
+            args: editedConfig.args || [],
+            env: editedConfig.env || {}
+          };
+          
+          // Mettre à jour les champs optionnels
+          if (editedConfig.autoApprove !== undefined) updatedServer.autoApprove = editedConfig.autoApprove;
+          if (editedConfig.disabled !== undefined) updatedServer.disabled = editedConfig.disabled;
+          if (editedConfig.timeout !== undefined) updatedServer.timeout = editedConfig.timeout;
+          if (editedConfig.transport !== undefined) updatedServer.transport = editedConfig.transport;
+          
+          await window.storage.set(serverId, JSON.stringify(updatedServer));
+        }
+      }
+      
+      // Sauvegarder dans le fichier agent
+      // Déterminer l'agent à partir des serveurs édités
+      const editedServerNames = Object.keys(mcpServers);
+      console.log('Edited server names:', editedServerNames);
+      const editedServers = servers.filter(s => editedServerNames.includes(s.name));
+      console.log('Edited servers:', editedServers);
+      
+      if (editedServers.length > 0 && editedServers[0].agentPath) {
+        const agentPath = editedServers[0].agentPath;
+        console.log('Saving to agent file:', agentPath);
+        const agentName = agentPath.split('/').pop().replace('.json', '');
+        console.log('Agent name:', agentName);
+        
+        // Récupérer TOUS les serveurs de cet agent
+        const agentServers = servers.filter(s => s.agentPath === agentPath);
+        console.log('Agent servers found:', agentServers.length);
+        const allMcpServers = {};
+        
+        for (const server of agentServers) {
+          // Utiliser la config éditée si disponible, sinon la config existante
+          if (mcpServers[server.name]) {
+            allMcpServers[server.name] = mcpServers[server.name];
+          } else {
+            const config = {
+              command: server.command,
+              args: server.args || [],
+              env: server.env || {}
+            };
+            
+            // Préserver les champs optionnels
+            if (server.autoApprove !== undefined) config.autoApprove = server.autoApprove;
+            if (server.disabled !== undefined) config.disabled = server.disabled;
+            if (server.timeout !== undefined) config.timeout = server.timeout;
+            if (server.transport !== undefined) config.transport = server.transport;
+            
+            allMcpServers[server.name] = config;
+          }
+        }
+        
+        console.log('Sending to backend:', { agentName, mcpServers: allMcpServers });
+        
+        const response = await fetch('http://localhost:3001/api/save-agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentName,
+            mcpServers: allMcpServers
+          })
+        });
+        
+        console.log('Backend response status:', response.status);
+        
+        if (!response.ok) {
+          const error = await response.json();
+          console.error('Backend error:', error);
+          throw new Error(error.error || 'Erreur lors de la sauvegarde du fichier');
+        }
+        
+        const result = await response.json();
+        console.log('Backend result:', result);
+      } else {
+        console.log('No agent path found for edited servers');
+        console.log('editedServers[0]:', editedServers[0]);
+      }
+      
+      await loadServers();
       setIsEditing(false);
       showNotification('Configuration sauvegardée avec succès!');
     } catch (error) {
-      showNotification('Erreur: JSON invalide', 'error');
+      console.error('Save error:', error);
+      showNotification(`Erreur: ${error.message}`, 'error');
     }
   };
 
@@ -175,18 +320,31 @@ const MCPManager = () => {
         return;
       }
       
+      // Utiliser le chemin fourni ou générer un chemin par défaut
+      const finalAgentPath = agentFilePath || `/home/nizar/.kiro/agents/${agentName}.json`;
+      
       let imported = 0;
       for (const [name, config] of entries) {
         if (config.command) {
-          const serverId = `mcp_server:${Date.now()}_${name}`;
+          // Chercher un serveur existant avec le même nom et agent
+          const existingServer = servers.find(s => s.name === name && s.agent === agentName);
+          const serverId = existingServer ? existingServer.id : `mcp_server:${Date.now()}_${name}`;
+          
           const serverData = {
             name,
             command: config.command,
             args: config.args || [],
             env: config.env || {},
             agent: agentName,
-            agentPath: agentFilePath
+            agentPath: finalAgentPath
           };
+          
+          // Préserver tous les champs optionnels
+          if (config.autoApprove !== undefined) serverData.autoApprove = config.autoApprove;
+          if (config.disabled !== undefined) serverData.disabled = config.disabled;
+          if (config.timeout !== undefined) serverData.timeout = config.timeout;
+          if (config.transport !== undefined) serverData.transport = config.transport;
+          
           await window.storage.set(serverId, JSON.stringify(serverData));
           imported++;
         }
@@ -261,6 +419,121 @@ const MCPManager = () => {
     }
   };
 
+  const toggleServerStatus = async (serverId) => {
+    try {
+      const server = servers.find(s => s.id === serverId);
+      if (!server) return;
+      
+      // Toggle disabled: si absent ou false, mettre à true; si true, mettre à false
+      const newDisabledStatus = server.disabled !== true;
+      
+      const updatedServer = {
+        ...server,
+        disabled: newDisabledStatus
+      };
+      
+      await window.storage.set(serverId, JSON.stringify(updatedServer));
+      
+      // Sauvegarder dans le fichier agent si disponible
+      if (server.agentPath) {
+        const agentName = server.agentPath.split('/').pop().replace('.json', '');
+        const agentServers = servers.filter(s => s.agentPath === server.agentPath);
+        const allMcpServers = {};
+        
+        for (const s of agentServers) {
+          const config = {
+            command: s.command,
+            args: s.args || [],
+            env: s.env || {}
+          };
+          
+          // Appliquer le nouveau statut pour le serveur concerné
+          const isDisabled = s.id === serverId ? newDisabledStatus : (s.disabled || false);
+          if (isDisabled !== undefined) config.disabled = isDisabled;
+          if (s.autoApprove !== undefined) config.autoApprove = s.autoApprove;
+          if (s.timeout !== undefined) config.timeout = s.timeout;
+          if (s.transport !== undefined) config.transport = s.transport;
+          
+          allMcpServers[s.name] = config;
+        }
+        
+        await fetch('http://localhost:3001/api/save-agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            agentName,
+            mcpServers: allMcpServers
+          })
+        });
+      }
+      
+      await loadServers();
+      showNotification(`Serveur ${newDisabledStatus ? 'désactivé' : 'activé'} avec succès!`);
+    } catch (error) {
+      showNotification('Erreur lors du changement de statut', 'error');
+    }
+  };
+
+  const toggleSelectionStatus = async (enable) => {
+    try {
+      if (selectedServers.size === 0 || agentFilter === 'all') return;
+      
+      const selectedServersList = servers.filter(s => selectedServers.has(s.id));
+      const agentPath = selectedServersList[0]?.agentPath;
+      
+      if (!agentPath) {
+        showNotification('Aucun chemin agent trouvé', 'error');
+        return;
+      }
+      
+      // Mettre à jour chaque serveur sélectionné
+      for (const server of selectedServersList) {
+        const updatedServer = {
+          ...server,
+          disabled: !enable
+        };
+        await window.storage.set(server.id, JSON.stringify(updatedServer));
+      }
+      
+      // Sauvegarder dans le fichier agent
+      const agentName = agentPath.split('/').pop().replace('.json', '');
+      const agentServers = servers.filter(s => s.agentPath === agentPath);
+      const allMcpServers = {};
+      
+      for (const s of agentServers) {
+        const config = {
+          command: s.command,
+          args: s.args || [],
+          env: s.env || {}
+        };
+        
+        // Appliquer le nouveau statut pour les serveurs sélectionnés
+        const isSelected = selectedServers.has(s.id);
+        const isDisabled = isSelected ? !enable : (s.disabled || false);
+        if (isDisabled !== undefined) config.disabled = isDisabled;
+        if (s.autoApprove !== undefined) config.autoApprove = s.autoApprove;
+        if (s.timeout !== undefined) config.timeout = s.timeout;
+        if (s.transport !== undefined) config.transport = s.transport;
+        
+        allMcpServers[s.name] = config;
+      }
+      
+      await fetch('http://localhost:3001/api/save-agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentName,
+          mcpServers: allMcpServers
+        })
+      });
+      
+      await loadServers();
+      showNotification(`${selectedServers.size} serveur(s) ${enable ? 'activé(s)' : 'désactivé(s)'} avec succès!`);
+    } catch (error) {
+      showNotification('Erreur lors du changement de statut', 'error');
+    }
+  };
+
   const addManualServer = async () => {
     const name = prompt('Nom du serveur:');
     if (!name) return;
@@ -321,6 +594,14 @@ const MCPManager = () => {
             <Globe size={20} />
             Scraper
           </button>
+          <button
+            onClick={migrateAgentPaths}
+            className="px-6 py-3 rounded-lg flex items-center gap-2 transition bg-yellow-600 hover:bg-yellow-700 ml-auto"
+            title="Mettre à jour les serveurs existants avec agentPath"
+          >
+            <Settings size={20} />
+            Migrer
+          </button>
         </div>
 
         <div className="mb-6 text-slate-300 text-sm">
@@ -352,27 +633,34 @@ const MCPManager = () => {
                   </select>
                   <button
                     onClick={toggleAll}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition flex items-center gap-2"
+                    disabled={agentFilter === 'all'}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <CheckSquare size={18} />
-                    {selectedServers.size === servers.filter(s => (agentFilter === 'all' || s.agent === agentFilter) && (searchQuery === '' || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.command.toLowerCase().includes(searchQuery.toLowerCase()))).length && servers.filter(s => (agentFilter === 'all' || s.agent === agentFilter) && (searchQuery === '' || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.command.toLowerCase().includes(searchQuery.toLowerCase()))).every(s => selectedServers.has(s.id)) ? 'Tout désélectionner' : 'Tout sélectionner'}
+                    {(() => {
+                      const filteredServers = servers.filter(s => 
+                        (agentFilter === 'all' || s.agent === agentFilter) && 
+                        (searchQuery === '' || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.command.toLowerCase().includes(searchQuery.toLowerCase()))
+                      );
+                      const allSelected = filteredServers.length > 0 && filteredServers.every(s => selectedServers.has(s.id));
+                      return allSelected ? 'Tout désélectionner' : 'Tout sélectionner';
+                    })()}
                   </button>
                   <button
-                    onClick={async () => {
-                      if (selectedServers.size === 0) return;
-                      if (!confirm(`Voulez-vous vraiment supprimer ${selectedServers.size} serveur(s) ?`)) return;
-                      for (const serverId of selectedServers) {
-                        await window.storage.delete(serverId);
-                      }
-                      setSelectedServers(new Set());
-                      await loadServers();
-                      showNotification(`${selectedServers.size} serveur(s) supprimé(s)!`);
-                    }}
-                    disabled={selectedServers.size === 0}
+                    onClick={() => toggleSelectionStatus(true)}
+                    disabled={selectedServers.size === 0 || agentFilter === 'all'}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Power size={18} />
+                    Activer sélection
+                  </button>
+                  <button
+                    onClick={() => toggleSelectionStatus(false)}
+                    disabled={selectedServers.size === 0 || agentFilter === 'all'}
                     className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Trash2 size={18} />
-                    Supprimer sélection
+                    <PowerOff size={18} />
+                    Désactiver sélection
                   </button>
                   <button
                     onClick={addManualServer}
@@ -391,43 +679,34 @@ const MCPManager = () => {
                   servers.filter(s => (agentFilter === 'all' || s.agent === agentFilter) && (searchQuery === '' || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.command.toLowerCase().includes(searchQuery.toLowerCase()))).map(server => (
                     <div
                       key={server.id}
-                      className="bg-slate-700/50 p-4 rounded-lg border border-slate-600 hover:border-purple-500 transition"
+                      className="bg-slate-700/50 p-3 rounded-lg border border-slate-600 hover:border-purple-500 transition"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3 flex-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1">
                           <button
                             onClick={() => toggleServer(server.id)}
-                            className="mt-1"
                           >
                             {selectedServers.has(server.id) ? (
-                              <CheckSquare size={24} className="text-purple-400" />
+                              <CheckSquare size={20} className="text-purple-400" />
                             ) : (
-                              <Square size={24} className="text-slate-500" />
+                              <Square size={20} className="text-slate-500" />
                             )}
                           </button>
                           <div className="flex-1">
-                            <h3 className="font-semibold text-lg">{server.name}</h3>
-                            <p className="text-slate-300 text-sm mt-1">
-                              <span className="text-purple-400">Commande:</span> {server.command}
-                            </p>
-                            {server.args && server.args.length > 0 && (
-                              <p className="text-slate-300 text-sm">
-                                <span className="text-purple-400">Args:</span> {server.args.join(', ')}
-                              </p>
-                            )}
-                            {server.agent && (
-                              <p className="text-slate-400 text-xs mt-1">Agent: {server.agent}</p>
-                            )}
-                            {server.source && (
-                              <p className="text-slate-400 text-xs mt-1">Source: {server.source}</p>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-base">{server.name}</h3>
+                              {server.agent && (
+                                <span className="text-slate-400 text-xs">({server.agent})</span>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <button
-                          onClick={() => deleteServer(server.id)}
-                          className="text-red-400 hover:text-red-300 transition ml-2"
+                          onClick={() => toggleServerStatus(server.id)}
+                          className={`transition ml-2 ${server.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}
+                          title={server.disabled ? 'Activer le serveur' : 'Désactiver le serveur'}
                         >
-                          <Trash2 size={20} />
+                          {server.disabled ? <PowerOff size={18} /> : <Power size={18} />}
                         </button>
                       </div>
                     </div>
