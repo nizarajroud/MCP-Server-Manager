@@ -69,6 +69,17 @@ mcp-server-manager/
 
 ## Git & Change Management
 
+### Workflow par User Story (OBLIGATOIRE — AUCUNE EXCEPTION)
+
+**Pour chaque User Story :**
+1. Créer une feature branch : `feat/<issue#>-<name>`
+2. Implémenter en suivant les conventions de ce fichier
+3. Mettre à jour ce steering file (operations log)
+4. Mettre à jour la page Notion "MCP Server Manager" sous Tooling
+5. Commit + Push + PR → Merge sur `main`
+
+**Ne jamais demander confirmation pour ces étapes — les exécuter automatiquement.**
+
 ### Branch Strategy
 - `main` — protected, always deployable
 - Feature branches: `feat/<issue#>-<name>`
