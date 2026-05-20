@@ -144,3 +144,4 @@ mcp-server-manager/
 | 2026-02-25 | Batch toggle | Activate/deactivate selection buttons |
 | 2026-02-25 | Add server | Empty editor for pasting new server config |
 | 2026-05-20 | Best practices | Applied Financial Advisor patterns (steering, CI/CD, tests, Makefile) |
+| 2026-05-20 | US-1 GitHub API | Replaced filesystem backend with GitHub API (branches, agents, commit+push) |
