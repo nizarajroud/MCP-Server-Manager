@@ -30,5 +30,18 @@ export const api = {
       throw new Error(err.error || 'Save failed');
     }
     return res.json();
+  },
+
+  async syncLocal(branch) {
+    const res = await fetch(`${API_URL}/api/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ branch })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Sync failed');
+    }
+    return res.json();
   }
 };

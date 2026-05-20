@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Database, Upload, CheckSquare, Square, Plus, Save, Edit, Power, PowerOff, GitBranch, RefreshCw } from 'lucide-react';
+import { Database, Upload, Download, CheckSquare, Square, Plus, Save, Edit, Power, PowerOff, GitBranch, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
 
 const MCPManager = () => {
@@ -173,6 +173,18 @@ const MCPManager = () => {
     }
   };
 
+  const syncLocal = async () => {
+    try {
+      setLoading(true);
+      const result = await api.syncLocal(selectedBranch);
+      showNotification(`${result.synced} agent(s) synchronisé(s) vers ~/.kiro/agents/`);
+    } catch (e) {
+      showNotification(`Erreur sync: ${e.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white p-6">
       <div className="max-w-6xl mx-auto">
@@ -214,6 +226,9 @@ const MCPManager = () => {
           </div>
           <button onClick={loadAgent} disabled={!selectedAgent} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition disabled:opacity-50">
             <RefreshCw size={18} />
+          </button>
+          <button onClick={syncLocal} disabled={!selectedBranch} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50" title="Sync vers ~/.kiro/agents/">
+            <Download size={18} /> Sync
           </button>
         </div>
 

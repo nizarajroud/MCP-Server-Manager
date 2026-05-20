@@ -107,6 +107,39 @@ app.put('/api/agent/:name', async (req, res) => {
   }
 });
 
+// POST /api/sync — Download agents from branch to ~/.kiro/agents/
+app.post('/api/sync', async (req, res) => {
+  try {
+    const { branch } = req.body;
+    if (!branch) return res.status(400).json({ error: 'branch required' });
+
+    const { default: fs } = await import('fs/promises');
+    const { default: path } = await import('path');
+    const { default: os } = await import('os');
+
+    const agentsDir = path.join(os.homedir(), '.kiro', 'agents');
+    await fs.mkdir(agentsDir, { recursive: true });
+
+    // List agents from branch
+    const listRes = await githubFetch(`/contents/agents?ref=${branch}`);
+    const files = await listRes.json();
+    const agentFiles = files.filter(f => f.name.endsWith('.json') && !f.name.includes('example'));
+
+    let synced = 0;
+    for (const file of agentFiles) {
+      const fileRes = await githubFetch(`/contents/${file.path}?ref=${branch}`);
+      const fileData = await fileRes.json();
+      const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
+      await fs.writeFile(path.join(agentsDir, file.name), content);
+      synced++;
+    }
+
+    res.json({ success: true, synced, path: agentsDir });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Backend démarré sur http://localhost:${PORT}`);
   if (!GITHUB_TOKEN) {
