@@ -14,8 +14,14 @@ Web application to manage Model Context Protocol (MCP) server configurations acr
 ## Architecture
 
 ```
-frontend/ (React + Vite, port 3000)  →  backend/ (Express, port 3001)  →  ~/.kiro/agents/*.json
+Browser (React + Vite, port 3000)  →  Backend (Express, port 3001)  →  GitHub API  →  nizarajroud/kiro-configs
 ```
+
+### Data Flow
+1. User selects a **branch** (personal-branch, csben-branch, main)
+2. User selects an **agent** (exp2, pilot, etc.)
+3. App displays MCP **servers** from that agent's JSON
+4. Changes (toggle, edit, add) are **committed + pushed** to the selected branch
 
 ## Quick Start
 

@@ -3,7 +3,7 @@
 ## Overview
 
 ```
-User → Frontend (React/Vite) → Backend (Express) → ~/.kiro/agents/*.json
+User → Frontend (React/Vite) → Backend (Express) → GitHub API → nizarajroud/kiro-configs
 ```
 
 ## Components
@@ -11,71 +11,69 @@ User → Frontend (React/Vite) → Backend (Express) → ~/.kiro/agents/*.json
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
 | Frontend | React 18, Vite 5, Tailwind CSS | SPA for managing MCP servers |
-| Backend | Express.js | File persistence API |
-| Storage | localStorage + filesystem | Server configs + agent JSON files |
+| Backend | Express.js | Proxy to GitHub API |
+| GitHub API | REST API v3 | Read/write agent configs |
+| kiro-configs | GitHub repo | Source of truth for all agent configs |
 
 ## Data Flow
 
-### Import Agent
+### Load Agents
 ```
-User uploads JSON → Frontend parses mcpServers → Stores in localStorage (with agentPath)
-```
-
-### Edit & Save
-```
-User edits config → Frontend sends POST /api/save-agent → Backend reads existing file → Merges mcpServers → Writes updated JSON
+User selects branch → GET /api/agents?branch=X → GitHub API → List agents/*.json
+User selects agent → GET /api/agent/:name?branch=X → GitHub API → Parse mcpServers
 ```
 
-### Toggle Enable/Disable
+### Save (commit + push)
 ```
-User clicks Power icon → Frontend updates localStorage → POST /api/save-agent → Backend updates disabled field in agent file
+User edits/toggles → PUT /api/agent/:name → GitHub API PUT /contents/agents/:name.json → Commit on branch
+```
+
+### Conflict Detection
+```
+On save: compare stored SHA with current SHA
+  → Match: commit succeeds
+  → Mismatch: prompt user "Écraser" or "Recharger"
 ```
 
 ## API Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/save-agent` | Save mcpServers to agent JSON file |
+| GET | `/api/branches` | List branches from kiro-configs |
+| GET | `/api/agents?branch=X` | List agent files in a branch |
+| GET | `/api/agent/:name?branch=X` | Get agent file content + SHA |
+| PUT | `/api/agent/:name` | Commit updated agent to branch |
 
-### POST /api/save-agent
+### PUT /api/agent/:name
 
 **Request:**
 ```json
 {
-  "agentName": "experiment",
-  "mcpServers": {
-    "server-name": {
-      "command": "uvx",
-      "args": ["package@latest"],
-      "env": {},
-      "disabled": false
-    }
-  }
+  "content": { "name": "exp2", "mcpServers": { ... } },
+  "sha": "abc123...",
+  "branch": "personal-branch",
+  "message": "feat: enable server X on exp2"
 }
 ```
 
-**Behavior:**
-1. Reads existing `~/.kiro/agents/{agentName}.json`
-2. Preserves all non-mcpServers fields ($schema, tools, resources, etc.)
-3. Replaces only the `mcpServers` section
-4. Writes back to file
+**Responses:**
+- `200` — Success, returns new SHA
+- `409` — Conflict (file modified since last read)
+- `400` — Missing required fields
 
-## File Structure (Agent JSON)
+## Branch Model
 
-```json
-{
-  "$schema": "...",
-  "name": "experiment",
-  "mcpServers": {
-    "server-name": {
-      "command": "uvx",
-      "args": ["..."],
-      "env": {},
-      "autoApprove": [],
-      "disabled": false
-    }
-  },
-  "tools": ["*"],
-  "resources": ["file://..."]
-}
+```
+kiro-configs repo
+├── main              (shared/reference config)
+├── personal-branch   (personal workstation)
+└── csben-branch      (other context)
+```
+
+Each branch contains:
+```
+agents/
+├── exp2.json
+├── pilot.json
+└── ...
 ```

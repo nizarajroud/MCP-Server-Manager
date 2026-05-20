@@ -76,7 +76,9 @@ mcp-server-manager/
 2. Implémenter en suivant les conventions de ce fichier
 3. Mettre à jour ce steering file (operations log)
 4. Mettre à jour la page Notion "MCP Server Manager" sous Tooling
-5. Commit + Push + PR → Merge sur `main`
+5. Mettre à jour le README.md si l'architecture ou les commandes changent
+6. Mettre à jour le diagramme d'architecture si le flux de données change
+7. Commit + Push + PR → Merge sur `main`
 
 **Ne jamais demander confirmation pour ces étapes — les exécuter automatiquement.**
 
