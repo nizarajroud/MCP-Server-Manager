@@ -1,6 +1,35 @@
-node_modules
-dist
-.DS_Store
-*.log
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment & secrets
 .env
 .env.local
+.env.*.local
+
+# Logs
+*.log
+vite.log
+backend.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+htmlcov/
+
+# Kiro conversations
+conv[0-9]
+conv[0-9][0-9]

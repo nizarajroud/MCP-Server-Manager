@@ -2,25 +2,9 @@
   "name": "mcp-server-manager",
   "version": "1.0.0",
   "description": "Manage your Model Context Protocol servers",
-  "type": "module",
-  "main": "src/index.jsx",
+  "private": true,
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "server": "node server.js"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "lucide-react": "^0.294.0",
-    "express": "^4.18.2"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.0",
-    "autoprefixer": "^10.4.16",
-    "postcss": "^8.4.32",
-    "tailwindcss": "^3.3.6",
-    "vite": "^5.0.7"
+    "dev": "./start-app.sh",
+    "setup": "bash scripts/setup-local.sh"
   }
 }
