@@ -12,6 +12,9 @@ cd backend && npm install --no-bin-links 2>&1 | tail -3 && cd ..
 
 # Lancer le backend en background
 echo "Démarrage du backend..."
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+fi
 nohup node backend/server.js > backend.log 2>&1 &
 
 # Attendre que le backend démarre
