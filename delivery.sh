@@ -70,6 +70,7 @@ case "$CHOICE" in
   fi
 
   echo "Déploiement de: $LATEST_TAG"
+  git reset --hard HEAD --quiet
   git checkout "$LATEST_TAG" --quiet
 
   # Écrire la version déployée
