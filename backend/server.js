@@ -40,7 +40,7 @@ app.get('/api/config', async (req, res) => {
   try {
     const { default: fs } = await import('fs/promises');
     const { default: path } = await import('path');
-    version = (await fs.readFile(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'VERSION'), 'utf-8')).trim();
+    version = (await fs.readFile(path.join(path.dirname(new URL(import.meta.url).pathname), '..', '.deployed-version'), 'utf-8')).trim();
   } catch (e) {}
   res.json({ localBranch: LOCAL_BRANCH, defaultAgent: DEFAULT_AGENT, version });
 });

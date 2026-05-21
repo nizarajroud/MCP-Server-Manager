@@ -63,6 +63,9 @@ case "$CHOICE" in
   echo "Déploiement de: $LATEST_TAG"
   git checkout "$LATEST_TAG" --quiet
 
+  # Écrire la version déployée
+  echo "$LATEST_TAG" > .deployed-version
+
   # Installer les dépendances
   echo "Installation des dépendances..."
   cd frontend && npm install --no-bin-links --silent 2>/dev/null && cd ..

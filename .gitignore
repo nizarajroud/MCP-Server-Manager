@@ -33,3 +33,6 @@ htmlcov/
 # Kiro conversations
 conv[0-9]
 conv[0-9][0-9]
+
+# Deployed version marker
+.deployed-version
