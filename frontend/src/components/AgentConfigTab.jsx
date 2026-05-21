@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
+import CodeMirror from '@uiw/react-codemirror';
+import { markdown } from '@codemirror/lang-markdown';
+import { json } from '@codemirror/lang-json';
+import { oneDark } from '@codemirror/theme-one-dark';
+
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, saveToGitHub, showNotification, api }) => {
   const [subTab, setSubTab] = useState('general');
   const [form, setForm] = useState({ name: '', description: '', welcomeMessage: '' });
   const [promptContent, setPromptContent] = useState('');
+  const [promptFilePath, setPromptFilePath] = useState('');
   const [toolsList, setToolsList] = useState('');
   const [resourcesList, setResourcesList] = useState('');
 
@@ -15,16 +22,41 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
         description: agentContent.description || '',
         welcomeMessage: agentContent.welcomeMessage || ''
       });
-      setPromptContent(agentContent.prompt || '');
       setToolsList((agentContent.tools || []).join('\n'));
       setResourcesList((agentContent.resources || []).join('\n'));
+      
+      const prompt = agentContent.prompt || '';
+      if (prompt.startsWith('file://')) {
+        const relativePath = prompt.replace('file://', '');
+        // Resolve relative to kiro-configs repo
+        const resolvedPath = `/home/nizar/HomeWspce/kiro-configs/agents/${relativePath}`.replace(/\/agents\/\.\.\//, '/');
+        setPromptFilePath(resolvedPath);
+        loadPromptFile(resolvedPath);
+      } else {
+        setPromptFilePath('');
+        setPromptContent(prompt);
+      }
     }
   }, [agentContent]);
+
+  const loadPromptFile = async (path) => {
+    try {
+      const res = await fetch(`${API_URL}/api/file?path=${encodeURIComponent(path)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPromptContent(data.content);
+      } else {
+        setPromptContent(`# Fichier non trouvé: ${path}`);
+      }
+    } catch (e) {
+      setPromptContent(`# Erreur chargement: ${e.message}`);
+    }
+  };
 
   const saveGeneral = async () => {
     try {
       const updated = { ...agentContent, name: form.name, description: form.description, welcomeMessage: form.welcomeMessage };
-      const result = await api.saveAgent(selectedAgent, {
+      await api.saveAgent(selectedAgent, {
         content: updated, sha: agentSha, branch: selectedBranch,
         message: `feat: update ${selectedAgent} general config`
       });
@@ -36,12 +68,23 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
 
   const savePrompt = async () => {
     try {
-      const updated = { ...agentContent, prompt: promptContent };
-      await api.saveAgent(selectedAgent, {
-        content: updated, sha: agentSha, branch: selectedBranch,
-        message: `feat: update ${selectedAgent} prompt`
-      });
-      showNotification('Prompt sauvegardé');
+      if (promptFilePath) {
+        // Save to local file
+        const res = await fetch(`${API_URL}/api/file`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: promptFilePath, content: promptContent })
+        });
+        if (res.ok) showNotification('Prompt sauvegardé');
+        else showNotification('Erreur sauvegarde prompt', 'error');
+      } else {
+        const updated = { ...agentContent, prompt: promptContent };
+        await api.saveAgent(selectedAgent, {
+          content: updated, sha: agentSha, branch: selectedBranch,
+          message: `feat: update ${selectedAgent} prompt`
+        });
+        showNotification('Prompt sauvegardé');
+      }
     } catch (e) {
       showNotification(`Erreur: ${e.message}`, 'error');
     }
@@ -117,8 +160,17 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
 
       {subTab === 'prompt' && (
         <div className="space-y-4">
-          <label className="block text-sm text-slate-400 mb-1">System Prompt (ou chemin fichier)</label>
-          <textarea value={promptContent} onChange={e => setPromptContent(e.target.value)} className="w-full h-64 px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg font-mono text-sm focus:border-purple-500 focus:outline-none" />
+          {promptFilePath && (
+            <p className="text-sm text-slate-400">📄 Fichier: <code className="text-purple-300">{promptFilePath}</code></p>
+          )}
+          <CodeMirror
+            value={promptContent}
+            onChange={setPromptContent}
+            theme={oneDark}
+            extensions={[markdown()]}
+            height="500px"
+            className="rounded-lg overflow-hidden border border-slate-600"
+          />
           <button onClick={savePrompt} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition flex items-center gap-2">
             <Save size={18} /> Sauvegarder
           </button>
@@ -128,7 +180,13 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
       {subTab === 'tools' && (
         <div className="space-y-4">
           <label className="block text-sm text-slate-400 mb-1">Tools autorisés (un par ligne)</label>
-          <textarea value={toolsList} onChange={e => setToolsList(e.target.value)} className="w-full h-48 px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg font-mono text-sm focus:border-purple-500 focus:outline-none" />
+          <CodeMirror
+            value={toolsList}
+            onChange={setToolsList}
+            theme={oneDark}
+            height="300px"
+            className="rounded-lg overflow-hidden border border-slate-600"
+          />
           <button onClick={saveTools} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition flex items-center gap-2">
             <Save size={18} /> Sauvegarder
           </button>
@@ -138,7 +196,13 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
       {subTab === 'resources' && (
         <div className="space-y-4">
           <label className="block text-sm text-slate-400 mb-1">Resources (un pattern par ligne)</label>
-          <textarea value={resourcesList} onChange={e => setResourcesList(e.target.value)} className="w-full h-48 px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg font-mono text-sm focus:border-purple-500 focus:outline-none" />
+          <CodeMirror
+            value={resourcesList}
+            onChange={setResourcesList}
+            theme={oneDark}
+            height="300px"
+            className="rounded-lg overflow-hidden border border-slate-600"
+          />
           <button onClick={saveResources} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition flex items-center gap-2">
             <Save size={18} /> Sauvegarder
           </button>

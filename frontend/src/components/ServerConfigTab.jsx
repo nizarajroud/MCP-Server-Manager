@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2 } from 'lucide-react';
+import CodeMirror from '@uiw/react-codemirror';
+import { json } from '@codemirror/lang-json';
+import { oneDark } from '@codemirror/theme-one-dark';
+
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selectedBranch, showNotification, api }) => {
   const [selectedServer, setSelectedServer] = useState('');
@@ -17,21 +22,17 @@ const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selec
       setDescription(config.description || '');
       setEnvVars(Object.entries(config.env || {}).map(([key, value]) => ({ key, value })));
       
-      // Detect wrapper from args
       const args = config.args || [];
       const wrapperArg = args.find(a => a.includes('wrapper'));
       setWrapperPath(wrapperArg || '');
       setWrapperContent('');
-      
-      if (wrapperArg) {
-        loadWrapper(wrapperArg);
-      }
+      if (wrapperArg) loadWrapper(wrapperArg);
     }
   }, [selectedServer, agentContent]);
 
   const loadWrapper = async (path) => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/file?path=${encodeURIComponent(path)}`);
+      const res = await fetch(`${API_URL}/api/file?path=${encodeURIComponent(path)}`);
       if (res.ok) {
         const data = await res.json();
         setWrapperContent(data.content);
@@ -73,7 +74,7 @@ const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selec
 
   const saveWrapper = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/file`, {
+      const res = await fetch(`${API_URL}/api/file`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: wrapperPath, content: wrapperContent })
@@ -120,7 +121,14 @@ const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selec
               </div>
               <div>
                 <label className="block text-sm text-slate-400 mb-1">Configuration JSON</label>
-                <textarea value={serverJson} onChange={e => setServerJson(e.target.value)} className="w-full h-64 px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg font-mono text-sm focus:border-purple-500 focus:outline-none" />
+                <CodeMirror
+                  value={serverJson}
+                  onChange={setServerJson}
+                  theme={oneDark}
+                  extensions={[json()]}
+                  height="400px"
+                  className="rounded-lg overflow-hidden border border-slate-600"
+                />
               </div>
               <button onClick={saveServerConfig} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition flex items-center gap-2">
                 <Save size={18} /> Sauvegarder
@@ -134,9 +142,20 @@ const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selec
                 <label className="block text-sm text-slate-400 mb-1">Chemin du wrapper</label>
                 <input value={wrapperPath} onChange={e => setWrapperPath(e.target.value)} className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg focus:border-purple-500 focus:outline-none font-mono text-sm" />
               </div>
+              {wrapperPath && (
+                <button onClick={() => loadWrapper(wrapperPath)} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-sm transition">
+                  Charger
+                </button>
+              )}
               <div>
                 <label className="block text-sm text-slate-400 mb-1">Contenu</label>
-                <textarea value={wrapperContent} onChange={e => setWrapperContent(e.target.value)} className="w-full h-64 px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg font-mono text-sm focus:border-purple-500 focus:outline-none" />
+                <CodeMirror
+                  value={wrapperContent}
+                  onChange={setWrapperContent}
+                  theme={oneDark}
+                  height="400px"
+                  className="rounded-lg overflow-hidden border border-slate-600"
+                />
               </div>
               <button onClick={saveWrapper} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition flex items-center gap-2">
                 <Save size={18} /> Sauvegarder
