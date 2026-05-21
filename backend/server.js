@@ -8,6 +8,7 @@ const GITHUB_API = 'https://api.github.com';
 const LOCAL_BRANCH = process.env.LOCAL_BRANCH || 'personal-branch';
 const DEFAULT_AGENT = process.env.DEFAULT_AGENT || 'exp2';
 const LEGACY_MCP_PATH = process.env.LEGACY_MCP_PATH || 'settings/mcp.json';
+const LOCAL_REPO_PATH = process.env.LOCAL_REPO_PATH || '/home/nizar/HomeWspce/kiro-configs';
 
 app.use(express.json());
 
@@ -137,6 +138,19 @@ const syncFileToLocal = async (filePath, branch) => {
   return null;
 };
 
+// Helper: git pull --rebase on local repo to sync with remote
+const pullLocalRepo = async (branch) => {
+  const { exec } = await import('child_process');
+  const { promisify } = await import('util');
+  const execAsync = promisify(exec);
+  try {
+    await execAsync(`git -C ${LOCAL_REPO_PATH} checkout ${branch} 2>/dev/null || true`);
+    await execAsync(`git -C ${LOCAL_REPO_PATH} pull --rebase origin ${branch}`);
+  } catch (e) {
+    console.error('Git pull failed:', e.message);
+  }
+};
+
 // PUT /api/agent/:name — Rebase + Commit + Push + Sync local
 app.put('/api/agent/:name', async (req, res) => {
   try {
@@ -181,6 +195,9 @@ app.put('/api/agent/:name', async (req, res) => {
 
     // 3. SYNC LOCAL: Download updated file to ~/.kiro/agents/
     const localPath = await syncFileToLocal(filePath, branch);
+
+    // 4. GIT PULL: Sync local repo with remote
+    await pullLocalRepo(branch);
 
     res.json({ success: true, sha: result.content.sha, commit: result.commit.sha, synced: localPath });
   } catch (error) {
@@ -316,6 +333,9 @@ app.put('/api/file', async (req, res) => {
           const err = await commitRes.json();
           return res.status(500).json({ error: `Commit failed: ${err.message}` });
         }
+
+        // Git pull on local repo
+        await pullLocalRepo(branch);
       }
     }
 
