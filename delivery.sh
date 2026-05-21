@@ -72,6 +72,7 @@ case "$CHOICE" in
   echo "Déploiement de: $LATEST_TAG"
   git reset --hard HEAD --quiet
   git checkout "$LATEST_TAG" --quiet
+  chmod +x restart-app.sh
 
   # Écrire la version déployée
   echo "$LATEST_TAG" > .deployed-version
