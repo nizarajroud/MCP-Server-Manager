@@ -57,7 +57,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
     try {
       const updated = { ...agentContent, name: form.name, description: form.description, welcomeMessage: form.welcomeMessage };
       await api.saveAgent(selectedAgent, {
-        content: updated, sha: agentSha, branch: selectedBranch,
+        content: updated, branch: selectedBranch,
         message: `feat: update ${selectedAgent} general config`
       });
       showNotification('Configuration générale sauvegardée');
@@ -69,18 +69,17 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
   const savePrompt = async () => {
     try {
       if (promptFilePath) {
-        // Save to local file
         const res = await fetch(`${API_URL}/api/file`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: promptFilePath, content: promptContent })
+          body: JSON.stringify({ path: promptFilePath, content: promptContent, branch: selectedBranch })
         });
-        if (res.ok) showNotification('Prompt sauvegardé');
+        if (res.ok) showNotification('Prompt sauvegardé, commité et synchronisé ✓');
         else showNotification('Erreur sauvegarde prompt', 'error');
       } else {
         const updated = { ...agentContent, prompt: promptContent };
         await api.saveAgent(selectedAgent, {
-          content: updated, sha: agentSha, branch: selectedBranch,
+          content: updated, branch: selectedBranch,
           message: `feat: update ${selectedAgent} prompt`
         });
         showNotification('Prompt sauvegardé');
@@ -95,7 +94,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
       const tools = toolsList.split('\n').map(t => t.trim()).filter(Boolean);
       const updated = { ...agentContent, tools };
       await api.saveAgent(selectedAgent, {
-        content: updated, sha: agentSha, branch: selectedBranch,
+        content: updated, branch: selectedBranch,
         message: `feat: update ${selectedAgent} tools`
       });
       showNotification('Tools sauvegardés');
@@ -109,7 +108,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
       const resources = resourcesList.split('\n').map(r => r.trim()).filter(Boolean);
       const updated = { ...agentContent, resources };
       await api.saveAgent(selectedAgent, {
-        content: updated, sha: agentSha, branch: selectedBranch,
+        content: updated, branch: selectedBranch,
         message: `feat: update ${selectedAgent} resources`
       });
       showNotification('Resources sauvegardées');

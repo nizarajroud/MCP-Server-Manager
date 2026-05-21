@@ -84,25 +84,17 @@ const MCPManager = () => {
     try {
       const updatedContent = { ...agentContent, mcpServers: updatedMcpServers };
       const result = await api.saveAgent(selectedAgent, {
-        content: updatedContent, sha: agentSha, branch: selectedBranch, message
+        content: updatedContent, branch: selectedBranch, message
       });
       setAgentSha(result.sha);
       setAgentContent(updatedContent);
-      showNotification(`Commit réussi sur ${selectedBranch}`);
+      showNotification(`Sauvegardé, commité et synchronisé ✓`);
       return true;
     } catch (e) {
-      if (e.message === 'CONFLICT') {
-        const { sha } = await api.getAgent(selectedAgent, selectedBranch);
-        const updatedContent = { ...agentContent, mcpServers: updatedMcpServers };
-        const result = await api.saveAgent(selectedAgent, {
-          content: updatedContent, sha, branch: selectedBranch, message
-        });
-        setAgentSha(result.sha);
-        setAgentContent(updatedContent);
-        showNotification(`Commit forcé sur ${selectedBranch}`);
-        return true;
-      }
       showNotification(`Erreur: ${e.message}`, 'error');
+      return false;
+    }
+  };
       return false;
     }
   };

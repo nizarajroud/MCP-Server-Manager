@@ -117,36 +117,60 @@ app.get('/api/agent/:name', async (req, res) => {
   }
 });
 
-// PUT /api/agent/:name — Save agent file (commit + push)
+// Helper: sync a single file from GitHub to local ~/.kiro/agents/
+const syncFileToLocal = async (filePath, branch) => {
+  const { default: fs } = await import('fs/promises');
+  const { default: path } = await import('path');
+  const { default: os } = await import('os');
+
+  const agentsDir = path.join(os.homedir(), '.kiro', 'agents');
+  await fs.mkdir(agentsDir, { recursive: true });
+
+  const response = await githubFetch(`/contents/${filePath}?ref=${branch}`);
+  if (response.ok) {
+    const fileData = await response.json();
+    const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
+    const localFile = path.join(agentsDir, path.basename(filePath));
+    await fs.writeFile(localFile, content);
+    return localFile;
+  }
+  return null;
+};
+
+// PUT /api/agent/:name — Rebase + Commit + Push + Sync local
 app.put('/api/agent/:name', async (req, res) => {
   try {
-    const { content, sha, branch, message } = req.body;
+    const { content, branch, message } = req.body;
 
-    if (!content || !sha || !branch) {
-      return res.status(400).json({ error: 'content, sha, and branch required' });
+    if (!content || !branch) {
+      return res.status(400).json({ error: 'content and branch required' });
     }
 
-    const encoded = Buffer.from(JSON.stringify(content, null, 2)).toString('base64');
-    
     // Déterminer le chemin selon l'agent
     const filePath = req.params.name === 'Commun' 
       ? LEGACY_MCP_PATH 
       : `agents/${req.params.name}.json`;
     const commitMessage = message || `feat: update ${req.params.name} config`;
 
+    // 1. REBASE: Fetch latest SHA (pull latest)
+    const latestRes = await githubFetch(`/contents/${filePath}?ref=${branch}`);
+    if (!latestRes.ok) {
+      return res.status(404).json({ error: 'File not found on remote' });
+    }
+    const latestFile = await latestRes.json();
+    const latestSha = latestFile.sha;
+
+    // 2. COMMIT + PUSH via GitHub API
+    const encoded = Buffer.from(JSON.stringify(content, null, 2)).toString('base64');
     const response = await githubFetch(`/contents/${filePath}`, {
       method: 'PUT',
       body: JSON.stringify({
         message: commitMessage,
         content: encoded,
-        sha,
+        sha: latestSha,
         branch
       })
     });
-
-    if (response.status === 409) {
-      return res.status(409).json({ error: 'conflict', message: 'Le fichier a été modifié depuis votre dernière lecture.' });
-    }
 
     if (!response.ok) {
       const err = await response.json();
@@ -154,7 +178,11 @@ app.put('/api/agent/:name', async (req, res) => {
     }
 
     const result = await response.json();
-    res.json({ success: true, sha: result.content.sha, commit: result.commit.sha });
+
+    // 3. SYNC LOCAL: Download updated file to ~/.kiro/agents/
+    const localPath = await syncFileToLocal(filePath, branch);
+
+    res.json({ success: true, sha: result.content.sha, commit: result.commit.sha, synced: localPath });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -245,13 +273,52 @@ app.get('/api/file', async (req, res) => {
   }
 });
 
-// PUT /api/file — Write a local file
+// PUT /api/file — Write local file + commit + push + sync
 app.put('/api/file', async (req, res) => {
   try {
     const { default: fs } = await import('fs/promises');
-    const { path: filePath, content } = req.body;
+    const { default: path } = await import('path');
+    const { default: os } = await import('os');
+    const { path: filePath, content, branch } = req.body;
     if (!filePath || content === undefined) return res.status(400).json({ error: 'path and content required' });
+
+    // 1. Write locally
     await fs.writeFile(filePath, content);
+
+    // 2. If branch provided, also commit + push to GitHub
+    if (branch) {
+      // Determine repo path relative to kiro-configs
+      const kiroConfigsBase = '/home/nizar/HomeWspce/kiro-configs/';
+      if (filePath.startsWith(kiroConfigsBase)) {
+        const repoPath = filePath.replace(kiroConfigsBase, '');
+        
+        // Rebase: get latest SHA
+        const latestRes = await githubFetch(`/contents/${repoPath}?ref=${branch}`);
+        let sha = null;
+        if (latestRes.ok) {
+          const latestFile = await latestRes.json();
+          sha = latestFile.sha;
+        }
+
+        // Commit + Push
+        const encoded = Buffer.from(content).toString('base64');
+        const commitRes = await githubFetch(`/contents/${repoPath}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            message: `feat: update ${path.basename(filePath)}`,
+            content: encoded,
+            sha,
+            branch
+          })
+        });
+
+        if (!commitRes.ok) {
+          const err = await commitRes.json();
+          return res.status(500).json({ error: `Commit failed: ${err.message}` });
+        }
+      }
+    }
+
     res.json({ success: true, path: filePath });
   } catch (e) {
     res.status(500).json({ error: e.message });

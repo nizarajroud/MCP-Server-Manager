@@ -46,7 +46,7 @@ const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selec
       const mcpServers = { ...agentContent.mcpServers, [selectedServer]: parsed };
       await api.saveAgent(selectedAgent, {
         content: { ...agentContent, mcpServers },
-        sha: agentSha, branch: selectedBranch,
+        branch: selectedBranch,
         message: `feat: update ${selectedServer} config on ${selectedAgent}`
       });
       showNotification('Configuration serveur sauvegardée');
@@ -63,7 +63,7 @@ const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selec
       const mcpServers = { ...agentContent.mcpServers, [selectedServer]: config };
       await api.saveAgent(selectedAgent, {
         content: { ...agentContent, mcpServers },
-        sha: agentSha, branch: selectedBranch,
+        branch: selectedBranch,
         message: `feat: update ${selectedServer} env vars on ${selectedAgent}`
       });
       showNotification('Variables d\'environnement sauvegardées');
@@ -77,9 +77,9 @@ const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selec
       const res = await fetch(`${API_URL}/api/file`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: wrapperPath, content: wrapperContent })
+        body: JSON.stringify({ path: wrapperPath, content: wrapperContent, branch: selectedBranch })
       });
-      if (res.ok) showNotification('Wrapper sauvegardé');
+      if (res.ok) showNotification('Wrapper sauvegardé, commité et synchronisé ✓');
       else showNotification('Erreur sauvegarde wrapper', 'error');
     } catch (e) {
       showNotification(`Erreur: ${e.message}`, 'error');

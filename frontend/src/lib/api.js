@@ -35,15 +35,12 @@ export const api = {
     return res.json();
   },
 
-  async saveAgent(name, { content, sha, branch, message }) {
+  async saveAgent(name, { content, branch, message }) {
     const res = await fetch(`${API_URL}/api/agent/${name}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, sha, branch, message })
+      body: JSON.stringify({ content, branch, message })
     });
-    if (res.status === 409) {
-      throw new Error('CONFLICT');
-    }
     if (!res.ok) {
       const err = await res.json();
       throw new Error(err.error || 'Save failed');
