@@ -24,7 +24,7 @@ const MCPManager = () => {
 
   useEffect(() => { loadConfig(); }, []);
   useEffect(() => { if (localBranch) loadBranches(); }, [localBranch]);
-  useEffect(() => { if (selectedBranch) loadAgents(); }, [selectedBranch, defaultAgent]);
+  useEffect(() => { if (selectedBranch) { loadAgents(); loadCategories(); } }, [selectedBranch, defaultAgent]);
   useEffect(() => { if (selectedAgent) loadAgent(); }, [selectedAgent]);
 
   const isLocalBranch = selectedBranch === localBranch;
@@ -40,7 +40,12 @@ const MCPManager = () => {
       setLocalBranch(config.localBranch);
       setDefaultAgent(config.defaultAgent);
       setVersion(config.version);
-      const cats = await api.getCategories();
+    } catch (e) {}
+  };
+
+  const loadCategories = async () => {
+    try {
+      const cats = await api.getCategories(selectedBranch);
       setCategories(cats);
     } catch (e) {}
   };
@@ -186,8 +191,10 @@ const MCPManager = () => {
             <HomeTab
               servers={servers}
               categories={categories}
+              setCategories={setCategories}
               agentContent={agentContent}
               selectedAgent={selectedAgent}
+              selectedBranch={selectedBranch}
               saveToGitHub={saveToGitHub}
               setServers={setServers}
               showNotification={showNotification}
