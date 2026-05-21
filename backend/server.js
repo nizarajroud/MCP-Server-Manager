@@ -364,11 +364,10 @@ app.post('/api/move-server', async (req, res) => {
     }
 
     const getAgentPath = (name) => name === 'Commun' ? LEGACY_MCP_PATH : `agents/${name}.json`;
-
-    // Fetch both agent files
     const srcPath = getAgentPath(sourceAgent);
     const destPath = getAgentPath(destAgent);
 
+    // Fetch both agent contents
     const [srcRes, destRes] = await Promise.all([
       githubFetch(`/contents/${srcPath}?ref=${branch}`),
       githubFetch(`/contents/${destPath}?ref=${branch}`)
@@ -391,14 +390,18 @@ app.post('/api/move-server', async (req, res) => {
       }
     }
 
-    // Commit destination first
+    // 1. REBASE dest: fetch latest SHA
+    const destLatestRes = await githubFetch(`/contents/${destPath}?ref=${branch}`);
+    const destLatest = await destLatestRes.json();
+
+    // 2. COMMIT + PUSH dest
     const destEncoded = Buffer.from(JSON.stringify(destContent, null, 2)).toString('base64');
     const destCommit = await githubFetch(`/contents/${destPath}`, {
       method: 'PUT',
       body: JSON.stringify({
         message: `feat: ${mode} ${serverNames.join(', ')} to ${destAgent}`,
         content: destEncoded,
-        sha: destFile.sha,
+        sha: destLatest.sha,
         branch
       })
     });
@@ -412,9 +415,9 @@ app.post('/api/move-server', async (req, res) => {
       for (const name of serverNames) {
         delete srcContent.mcpServers[name];
       }
-      // Re-fetch source SHA (may have changed if same file)
-      const srcRefresh = await githubFetch(`/contents/${srcPath}?ref=${branch}`);
-      const srcLatest = await srcRefresh.json();
+      // REBASE src: fetch latest SHA
+      const srcLatestRes = await githubFetch(`/contents/${srcPath}?ref=${branch}`);
+      const srcLatest = await srcLatestRes.json();
 
       const srcEncoded = Buffer.from(JSON.stringify(srcContent, null, 2)).toString('base64');
       const srcCommit = await githubFetch(`/contents/${srcPath}`, {
@@ -432,9 +435,11 @@ app.post('/api/move-server', async (req, res) => {
       }
     }
 
-    // Sync local
-    await syncFileToLocal(destPath, branch);
-    if (mode === 'move') await syncFileToLocal(srcPath, branch);
+    // 3. SYNC LOCAL: only for non-Commun agents (Commun lives in settings/, git pull handles it)
+    if (destAgent !== 'Commun') await syncFileToLocal(destPath, branch);
+    if (mode === 'move' && sourceAgent !== 'Commun') await syncFileToLocal(srcPath, branch);
+
+    // 4. GIT PULL: sync local repo
     await pullLocalRepo(branch);
 
     res.json({ success: true, moved: serverNames, from: sourceAgent, to: destAgent, mode });
