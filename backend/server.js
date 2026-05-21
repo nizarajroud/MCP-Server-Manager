@@ -232,6 +232,32 @@ app.post('/api/sync', async (req, res) => {
   }
 });
 
+// GET /api/file?path= — Read a local file
+app.get('/api/file', async (req, res) => {
+  try {
+    const { default: fs } = await import('fs/promises');
+    const filePath = req.query.path;
+    if (!filePath) return res.status(400).json({ error: 'path required' });
+    const content = await fs.readFile(filePath, 'utf-8');
+    res.json({ content, path: filePath });
+  } catch (e) {
+    res.status(404).json({ error: 'File not found' });
+  }
+});
+
+// PUT /api/file — Write a local file
+app.put('/api/file', async (req, res) => {
+  try {
+    const { default: fs } = await import('fs/promises');
+    const { path: filePath, content } = req.body;
+    if (!filePath || content === undefined) return res.status(400).json({ error: 'path and content required' });
+    await fs.writeFile(filePath, content);
+    res.json({ success: true, path: filePath });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Backend démarré sur http://localhost:${PORT}`);
   if (!GITHUB_TOKEN) {
