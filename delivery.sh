@@ -8,21 +8,14 @@ SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 cd "$APP_DIR"
 
 # === Menu ===
-echo "╔══════════════════════════════════╗"
-echo "║   MCP Server Manager - Delivery  ║"
-echo "╠══════════════════════════════════╣"
-echo "║  1) Créer un tag                 ║"
-echo "║  2) Déployer une version         ║"
-echo "╚══════════════════════════════════╝"
-echo ""
-read -p "Choix [1/2]: " CHOICE
+CHOICE=$(echo -e "Créer un tag\nDéployer une version" | fzf --prompt="Delivery > " --height=5 --reverse)
 
 case "$CHOICE" in
 
 # ============================================================
 # OPTION 1: Créer un tag
 # ============================================================
-1)
+"Créer un tag")
   git checkout main --quiet
   git pull --rebase origin main --quiet
 
@@ -49,7 +42,7 @@ case "$CHOICE" in
 # ============================================================
 # OPTION 2: Déployer une version
 # ============================================================
-2)
+"Déployer une version")
   # Fetch tags et checkout le dernier
   echo "Récupération des tags..."
   git fetch --tags --quiet
@@ -124,7 +117,7 @@ EOF
   ;;
 
 *)
-  echo "Choix invalide"
-  exit 1
+  echo "Annulé."
+  exit 0
   ;;
 esac
