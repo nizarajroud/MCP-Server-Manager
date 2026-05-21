@@ -80,10 +80,11 @@ case "$CHOICE" in
   cd frontend && npm install --no-bin-links --silent 2>/dev/null && cd ..
   cd backend && npm install --no-bin-links --silent 2>/dev/null && cd ..
 
-  # Copier .env depuis le dev si absent
-  if [ ! -f .env ] && [ -f "$DEV_DIR/.env" ]; then
-    cp "$DEV_DIR/.env" .env
-  fi
+  # Copier .env depuis le dev et ajuster pour la prod
+  cp "$DEV_DIR/.env" .env
+  sed -i "s|^VITE_BACKEND_URL=.*|VITE_BACKEND_URL=http://localhost:${PROD_BACKEND_PORT}|" .env
+  # Ajouter si absent
+  grep -q "^VITE_BACKEND_URL" .env || echo "VITE_BACKEND_URL=http://localhost:${PROD_BACKEND_PORT}" >> .env
 
   # Ports prod
   PORT=$PROD_BACKEND_PORT
