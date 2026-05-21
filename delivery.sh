@@ -65,13 +65,13 @@ case "$CHOICE" in
   cd backend && npm install --no-bin-links --silent 2>/dev/null && cd ..
 
   # Lire le port
-  PORT=$(grep -E "^PORT=" .env 2>/dev/null | cut -d= -f2 || echo "3001")
-  FRONTEND_PORT=$(grep -E "^VITE_PORT=" .env 2>/dev/null | cut -d= -f2 || echo "3000")
+  PORT=4001
+  FRONTEND_PORT=4000
 
-  # Arrêter l'existant
-  echo "Arrêt des processus existants..."
-  pkill -f "node.*vite.js.*${APP_DIR}" 2>/dev/null || true
-  pkill -f "node.*server.js.*${APP_DIR}" 2>/dev/null || true
+  # Arrêter uniquement les processus prod
+  echo "Arrêt des processus prod..."
+  pkill -f "node.*server.js.*--port.*4001" 2>/dev/null || true
+  pkill -f "node.*vite.js.*--port.*4000" 2>/dev/null || true
   systemctl stop "$SERVICE_NAME" 2>/dev/null || true
   sleep 1
 
@@ -79,18 +79,19 @@ case "$CHOICE" in
   echo "Configuration du service systemd..."
   sudo tee "$SERVICE_FILE" > /dev/null <<EOF
 [Unit]
-Description=MCP Server Manager
+Description=MCP Server Manager (prod)
 After=network.target
 
 [Service]
 Type=forking
 WorkingDirectory=${APP_DIR}
-ExecStart=${APP_DIR}/restart-app.sh
-ExecStop=/usr/bin/pkill -f "node.*(vite|server).js"
+ExecStart=${APP_DIR}/restart-app.sh --prod
+ExecStop=/usr/bin/pkill -f "node.*(vite|server).js.*--port.*(4000|4001)"
 Restart=on-failure
 User=$(whoami)
 Environment=PATH=/usr/bin:/usr/local/bin
-EnvironmentFile=${APP_DIR}/.env
+Environment=PORT=4001
+Environment=VITE_PORT=4000
 
 [Install]
 WantedBy=multi-user.target
