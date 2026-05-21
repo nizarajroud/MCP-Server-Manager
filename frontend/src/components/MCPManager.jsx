@@ -5,7 +5,6 @@ import HomeTab from './HomeTab';
 import AgentConfigTab from './AgentConfigTab';
 import ServerConfigTab from './ServerConfigTab';
 import BacklogTab from './BacklogTab';
-import ServerConfigTab from './ServerConfigTab';
 
 const MCPManager = () => {
   const [branches, setBranches] = useState([]);
