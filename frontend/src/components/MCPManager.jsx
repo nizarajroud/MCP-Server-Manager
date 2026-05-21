@@ -4,6 +4,8 @@ import { api } from '../lib/api';
 import HomeTab from './HomeTab';
 import AgentConfigTab from './AgentConfigTab';
 import ServerConfigTab from './ServerConfigTab';
+import BacklogTab from './BacklogTab';
+import ServerConfigTab from './ServerConfigTab';
 
 const MCPManager = () => {
   const [branches, setBranches] = useState([]);
@@ -122,7 +124,8 @@ const MCPManager = () => {
   const mainTabs = [
     { id: 'home', label: 'Home' },
     { id: 'agents', label: 'Configuration des agents' },
-    { id: 'servers', label: 'Configuration serveur MCP' }
+    { id: 'servers', label: 'Configuration serveur MCP' },
+    { id: 'backlog', label: 'Backlog de mise à jour' }
   ];
 
   return (
@@ -217,7 +220,11 @@ const MCPManager = () => {
             />
           )}
 
-          {!loading && !selectedAgent && (
+          {!loading && mainTab === 'backlog' && (
+            <BacklogTab showNotification={showNotification} />
+          )}
+
+          {!loading && !selectedAgent && mainTab !== 'backlog' && (
             <p className="text-slate-400">Sélectionnez un agent pour commencer.</p>
           )}
         </div>

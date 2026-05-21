@@ -9,6 +9,8 @@ const LOCAL_BRANCH = process.env.LOCAL_BRANCH || 'personal-branch';
 const DEFAULT_AGENT = process.env.DEFAULT_AGENT || 'exp2';
 const LEGACY_MCP_PATH = process.env.LEGACY_MCP_PATH || 'settings/mcp.json';
 const LOCAL_REPO_PATH = process.env.LOCAL_REPO_PATH || '/home/nizar/HomeWspce/kiro-configs';
+const BACKLOG_REPO = process.env.BACKLOG_REPO || 'nizarajroud/MCP-Server-Manager';
+const BACKLOG_LABEL = process.env.BACKLOG_LABEL || 'backlog';
 
 app.use(express.json());
 
@@ -348,6 +350,42 @@ app.put('/api/file', async (req, res) => {
     }
 
     res.json({ success: true, path: filePath });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/issues — List open issues from backlog repo
+app.get('/api/issues', async (req, res) => {
+  try {
+    const [owner, repo] = BACKLOG_REPO.split('/');
+    const response = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/issues?state=open&labels=${BACKLOG_LABEL}&per_page=50`, {
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    const issues = await response.json();
+    res.json(issues.map(i => ({ number: i.number, title: i.title, state: i.state, created_at: i.created_at })));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/issues — Create a new issue in backlog repo
+app.post('/api/issues', async (req, res) => {
+  try {
+    const { title } = req.body;
+    if (!title) return res.status(400).json({ error: 'title required' });
+    const [owner, repo] = BACKLOG_REPO.split('/');
+    const response = await fetch(`${GITHUB_API}/repos/${owner}/${repo}/issues`, {
+      method: 'POST',
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, labels: [BACKLOG_LABEL] })
+    });
+    if (!response.ok) {
+      const err = await response.json();
+      return res.status(response.status).json({ error: err.message });
+    }
+    const issue = await response.json();
+    res.json({ number: issue.number, title: issue.title, state: issue.state, created_at: issue.created_at });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

@@ -72,5 +72,23 @@ export const api = {
       throw new Error(err.error || 'Check failed');
     }
     return res.json();
+  },
+
+  async getIssues() {
+    const res = await fetch(`${API_URL}/api/issues`);
+    return res.json();
+  },
+
+  async createIssue(title) {
+    const res = await fetch(`${API_URL}/api/issues`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Create failed');
+    }
+    return res.json();
   }
 };
