@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-APP_DIR="/mnt/d/PERSONAL/SKILLS/Technical/workspace/Trainings/MCP-Server-Manager"
+DEV_DIR="/mnt/d/PERSONAL/SKILLS/Technical/workspace/Trainings/MCP-Server-Manager"
+PROD_DIR="/home/nizar/.mcp-server-manager-prod"
+REPO_URL="https://github.com/nizarajroud/MCP-Server-Manager.git"
 SERVICE_NAME="mcp-server-manager"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-
-cd "$APP_DIR"
 
 # === Menu ===
 CHOICE=$(echo -e "Créer un tag\nDéployer une version" | fzf --prompt="Delivery > " --height=5 --reverse)
@@ -13,9 +13,10 @@ CHOICE=$(echo -e "Créer un tag\nDéployer une version" | fzf --prompt="Delivery
 case "$CHOICE" in
 
 # ============================================================
-# OPTION 1: Créer un tag
+# OPTION 1: Créer un tag (depuis le dossier dev, sur main)
 # ============================================================
 "Créer un tag")
+  cd "$DEV_DIR"
   git checkout main --quiet
   git pull --rebase origin main --quiet
 
@@ -40,12 +41,18 @@ case "$CHOICE" in
   ;;
 
 # ============================================================
-# OPTION 2: Déployer une version
+# OPTION 2: Déployer une version (dans le dossier prod isolé)
 # ============================================================
 "Déployer une version")
-  # Fetch tags et checkout le dernier
-  echo "Récupération des tags..."
+  # Cloner ou mettre à jour le dossier prod
+  if [ ! -d "$PROD_DIR" ]; then
+    echo "Clonage du repo dans $PROD_DIR..."
+    git clone "$REPO_URL" "$PROD_DIR" --quiet
+  fi
+
+  cd "$PROD_DIR"
   git fetch --tags --quiet
+
   LATEST_TAG=$(git tag -l --sort=-v:refname | head -1)
 
   if [ -z "$LATEST_TAG" ]; then
@@ -64,14 +71,19 @@ case "$CHOICE" in
   cd frontend && npm install --no-bin-links --silent 2>/dev/null && cd ..
   cd backend && npm install --no-bin-links --silent 2>/dev/null && cd ..
 
-  # Lire le port
+  # Copier .env depuis le dev si absent
+  if [ ! -f .env ] && [ -f "$DEV_DIR/.env" ]; then
+    cp "$DEV_DIR/.env" .env
+  fi
+
+  # Ports prod
   PORT=4001
   FRONTEND_PORT=4000
 
   # Arrêter uniquement les processus prod
   echo "Arrêt des processus prod..."
-  pkill -f "node.*server.js.*--port.*4001" 2>/dev/null || true
-  pkill -f "node.*vite.js.*--port.*4000" 2>/dev/null || true
+  lsof -ti:$PORT | xargs kill 2>/dev/null || true
+  lsof -ti:$FRONTEND_PORT | xargs kill 2>/dev/null || true
   systemctl stop "$SERVICE_NAME" 2>/dev/null || true
   sleep 1
 
@@ -84,9 +96,9 @@ After=network.target
 
 [Service]
 Type=forking
-WorkingDirectory=${APP_DIR}
-ExecStart=${APP_DIR}/restart-app.sh --prod
-ExecStop=/usr/bin/pkill -f "node.*(vite|server).js.*--port.*(4000|4001)"
+WorkingDirectory=${PROD_DIR}
+ExecStart=${PROD_DIR}/restart-app.sh --prod
+ExecStop=/usr/bin/kill \$(lsof -ti:4000) \$(lsof -ti:4001) 2>/dev/null || true
 Restart=on-failure
 User=$(whoami)
 Environment=PATH=/usr/bin:/usr/local/bin
@@ -108,6 +120,7 @@ EOF
     echo ""
     echo "✅ Déploiement réussi"
     echo "   Version: $LATEST_TAG"
+    echo "   Dossier: $PROD_DIR"
     echo "   Frontend: http://localhost:${FRONTEND_PORT}"
     echo "   Backend: http://localhost:${PORT}"
     echo "   Auto-start: activé"
