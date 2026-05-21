@@ -9,8 +9,8 @@ fi
 
 # Déterminer les ports (dev par défaut, prod si --prod)
 if [ "$1" = "--prod" ]; then
-  BACKEND_PORT=${PORT:-${PROD_BACKEND_PORT:-4001}}
-  FRONTEND_PORT=${VITE_PORT:-${PROD_FRONTEND_PORT:-4000}}
+  BACKEND_PORT=${PROD_BACKEND_PORT:-4001}
+  FRONTEND_PORT=${PROD_FRONTEND_PORT:-4000}
   MODE="prod"
 else
   BACKEND_PORT=${DEV_BACKEND_PORT:-3001}
