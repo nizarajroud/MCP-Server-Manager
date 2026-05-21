@@ -299,13 +299,9 @@ app.put('/api/file', async (req, res) => {
     const { path: filePath, content, branch } = req.body;
     if (!filePath || content === undefined) return res.status(400).json({ error: 'path and content required' });
 
-    // 1. Write locally
-    await fs.writeFile(filePath, content);
-
-    // 2. If branch provided, also commit + push to GitHub
     if (branch) {
       // Determine repo path relative to kiro-configs
-      const kiroConfigsBase = '/home/nizar/HomeWspce/kiro-configs/';
+      const kiroConfigsBase = LOCAL_REPO_PATH + '/';
       if (filePath.startsWith(kiroConfigsBase)) {
         const repoPath = filePath.replace(kiroConfigsBase, '');
         
@@ -334,9 +330,15 @@ app.put('/api/file', async (req, res) => {
           return res.status(500).json({ error: `Commit failed: ${err.message}` });
         }
 
-        // Git pull on local repo
+        // Git pull on local repo — this updates the local file
         await pullLocalRepo(branch);
+      } else {
+        // File outside repo — just write locally
+        await fs.writeFile(filePath, content);
       }
+    } else {
+      // No branch — just write locally
+      await fs.writeFile(filePath, content);
     }
 
     res.json({ success: true, path: filePath });
