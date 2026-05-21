@@ -15,11 +15,60 @@ const MCPManager = () => {
   const [editedConfig, setEditedConfig] = useState('');
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const [loading, setLoading] = useState(false);
+  const [localBranch, setLocalBranch] = useState('');
+  const [categories, setCategories] = useState({});
+  const [collapsedCategories, setCollapsedCategories] = useState(new Set());
+  const [defaultAgent, setDefaultAgent] = useState('');
 
-  useEffect(() => { loadBranches(); }, []);
-  useEffect(() => { if (selectedBranch) loadAgents(); }, [selectedBranch]);
+  useEffect(() => { loadConfig(); }, []);
+  useEffect(() => { if (localBranch) loadBranches(); }, [localBranch]);
+  useEffect(() => { if (selectedBranch) loadAgents(); }, [selectedBranch, defaultAgent]);
   useEffect(() => { if (selectedAgent) loadAgent(); }, [selectedAgent]);
   useEffect(() => { setSelectedServers(new Set()); }, [selectedAgent]);
+
+  const isLocalBranch = selectedBranch === localBranch;
+
+  const loadConfig = async () => {
+    try {
+      const config = await api.getConfig();
+      setLocalBranch(config.localBranch);
+      setDefaultAgent(config.defaultAgent);
+      const cats = await api.getCategories();
+      setCategories(cats);
+      setCollapsedCategories(new Set([...Object.keys(cats), '📦 Non catégorisé']));
+    } catch (e) {}
+  };
+
+  const getServerCategory = (serverName) => {
+    for (const [category, serverList] of Object.entries(categories)) {
+      if (serverList.includes(serverName)) return category;
+    }
+    return '📦 Non catégorisé';
+  };
+
+  const getGroupedServers = () => {
+    const grouped = {};
+    for (const server of servers) {
+      const category = getServerCategory(server.name);
+      if (!grouped[category]) grouped[category] = [];
+      grouped[category].push(server);
+    }
+    // Trier : actifs en premier, désactivés en bas
+    for (const category of Object.keys(grouped)) {
+      grouped[category].sort((a, b) => (a.disabled ? 1 : 0) - (b.disabled ? 1 : 0));
+    }
+    return grouped;
+  };
+
+  const toggleCategory = (category) => {
+    const newCollapsed = new Set(collapsedCategories);
+    if (newCollapsed.has(category)) {
+      newCollapsed.delete(category);
+    } else {
+      newCollapsed.add(category);
+    }
+    setCollapsedCategories(newCollapsed);
+  };
 
   const showNotification = (message, type = 'success') => {
     setNotification({ show: true, message, type });
@@ -30,7 +79,8 @@ const MCPManager = () => {
     try {
       const data = await api.getBranches();
       setBranches(data);
-      if (data.length > 0) setSelectedBranch(data[0]);
+      if (data.includes(localBranch)) setSelectedBranch(localBranch);
+      else if (data.length > 0) setSelectedBranch(data[0]);
     } catch (e) {
       showNotification('Erreur chargement des branches', 'error');
     }
@@ -42,6 +92,7 @@ const MCPManager = () => {
       setServers([]);
       const data = await api.getAgents(selectedBranch);
       setAgents(data);
+      if (defaultAgent && data.find(a => a.name === defaultAgent)) setSelectedAgent(defaultAgent);
     } catch (e) {
       showNotification('Erreur chargement des agents', 'error');
     }
@@ -176,6 +227,22 @@ const MCPManager = () => {
   const syncLocal = async () => {
     try {
       setLoading(true);
+      
+      const check = await api.checkSyncConflicts(selectedBranch);
+      
+      if (check.conflicts.length > 0) {
+        const confirmed = confirm(
+          `⚠️ ${check.conflicts.length} fichier(s) modifié(s) localement seront écrasés :\n\n` +
+          check.conflicts.map(f => `  • ${f}`).join('\n') +
+          `\n\nVoulez-vous continuer et écraser ces fichiers ?`
+        );
+        
+        if (!confirmed) {
+          showNotification('Sync annulé', 'error');
+          return;
+        }
+      }
+      
       const result = await api.syncLocal(selectedBranch);
       showNotification(`${result.synced} agent(s) synchronisé(s) vers ~/.kiro/agents/`);
     } catch (e) {
@@ -227,7 +294,7 @@ const MCPManager = () => {
           <button onClick={loadAgent} disabled={!selectedAgent} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition disabled:opacity-50">
             <RefreshCw size={18} />
           </button>
-          <button onClick={syncLocal} disabled={!selectedBranch} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50" title="Sync vers ~/.kiro/agents/">
+          <button onClick={syncLocal} disabled={!isLocalBranch} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50" title={isLocalBranch ? 'Sync vers ~/.kiro/agents/' : 'Sync disponible uniquement pour la branche locale'}>
             <Download size={18} /> Sync
           </button>
         </div>
@@ -248,7 +315,7 @@ const MCPManager = () => {
                 <button onClick={() => toggleSelectionStatus(false)} disabled={selectedServers.size === 0} className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50">
                   <PowerOff size={18} /> Désactiver
                 </button>
-                <button onClick={addServer} className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg transition flex items-center gap-2">
+                <button disabled className="px-4 py-2 bg-green-600 rounded-lg transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" title="L'ajout se fait via l'agent Forge">
                   <Plus size={18} /> Ajouter
                 </button>
               </div>
@@ -257,28 +324,43 @@ const MCPManager = () => {
             {loading ? (
               <p className="text-slate-400">Chargement...</p>
             ) : (
-              <div className="space-y-2">
-                {servers.map(server => (
-                  <div key={server.name} className="bg-slate-700/50 p-3 rounded-lg border border-slate-600 hover:border-purple-500 transition">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <button onClick={() => {
-                          const s = new Set(selectedServers);
-                          s.has(server.name) ? s.delete(server.name) : s.add(server.name);
-                          setSelectedServers(s);
-                        }}>
-                          {selectedServers.has(server.name) ? <CheckSquare size={20} className="text-purple-400" /> : <Square size={20} className="text-slate-500" />}
-                        </button>
-                        <h3 className="font-semibold text-base">{server.name}</h3>
+              <div className="space-y-3">
+                {Object.entries(getGroupedServers()).map(([category, categoryServers]) => (
+                  <div key={category} className="border border-slate-600 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() => toggleCategory(category)}
+                      className="w-full flex items-center justify-between px-4 py-2 bg-slate-700/80 hover:bg-slate-700 transition"
+                    >
+                      <span className="font-semibold">{category}</span>
+                      <span className="text-slate-400">{collapsedCategories.has(category) ? '▶' : '▼'}</span>
+                    </button>
+                    {!collapsedCategories.has(category) && (
+                      <div className="space-y-1 p-2">
+                        {categoryServers.map(server => (
+                          <div key={server.name} className="bg-slate-700/50 p-2 rounded border border-slate-600 hover:border-purple-500 transition">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1">
+                                <button onClick={() => {
+                                  const s = new Set(selectedServers);
+                                  s.has(server.name) ? s.delete(server.name) : s.add(server.name);
+                                  setSelectedServers(s);
+                                }}>
+                                  {selectedServers.has(server.name) ? <CheckSquare size={18} className="text-purple-400" /> : <Square size={18} className="text-slate-500" />}
+                                </button>
+                                <h3 className="text-sm">{server.name}</h3>
+                              </div>
+                              <button
+                                onClick={() => toggleServerStatus(server.name)}
+                                className={`transition ml-2 ${server.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}
+                                title={server.disabled ? 'Activer' : 'Désactiver'}
+                              >
+                                {server.disabled ? <PowerOff size={16} /> : <Power size={16} />}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <button
-                        onClick={() => toggleServerStatus(server.name)}
-                        className={`transition ml-2 ${server.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}
-                        title={server.disabled ? 'Activer' : 'Désactiver'}
-                      >
-                        {server.disabled ? <PowerOff size={18} /> : <Power size={18} />}
-                      </button>
-                    </div>
+                    )}
                   </div>
                 ))}
               </div>
