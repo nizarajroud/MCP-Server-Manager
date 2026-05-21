@@ -1,11 +1,20 @@
 #!/bin/bash
 set -e
 
-DEV_DIR="/mnt/d/PERSONAL/SKILLS/Technical/workspace/Trainings/MCP-Server-Manager"
-PROD_DIR="/home/nizar/.mcp-server-manager-prod"
-REPO_URL="https://github.com/nizarajroud/MCP-Server-Manager.git"
-SERVICE_NAME="mcp-server-manager"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Charger .env
+if [ -f "$SCRIPT_DIR/.env" ]; then
+  export $(grep -v '^#' "$SCRIPT_DIR/.env" | grep -v '^$' | xargs)
+fi
+
+DEV_DIR="$SCRIPT_DIR"
+PROD_DIR="${PROD_DIR:-/home/nizar/.mcp-server-manager-prod}"
+REPO_URL="${APP_REPO_URL:-https://github.com/nizarajroud/MCP-Server-Manager.git}"
+SERVICE_NAME="${SERVICE_NAME:-mcp-server-manager}"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+PROD_BACKEND_PORT="${PROD_BACKEND_PORT:-4001}"
+PROD_FRONTEND_PORT="${PROD_FRONTEND_PORT:-4000}"
 
 # === Menu ===
 CHOICE=$(echo -e "Créer un tag\nDéployer une version" | fzf --prompt="Delivery > " --height=5 --reverse)
@@ -77,8 +86,8 @@ case "$CHOICE" in
   fi
 
   # Ports prod
-  PORT=4001
-  FRONTEND_PORT=4000
+  PORT=$PROD_BACKEND_PORT
+  FRONTEND_PORT=$PROD_FRONTEND_PORT
 
   # Arrêter uniquement les processus prod
   echo "Arrêt des processus prod..."
@@ -98,12 +107,12 @@ After=network.target
 Type=forking
 WorkingDirectory=${PROD_DIR}
 ExecStart=${PROD_DIR}/restart-app.sh --prod
-ExecStop=/usr/bin/kill \$(lsof -ti:4000) \$(lsof -ti:4001) 2>/dev/null || true
+ExecStop=/usr/bin/kill \$(lsof -ti:${PROD_FRONTEND_PORT}) \$(lsof -ti:${PROD_BACKEND_PORT}) 2>/dev/null || true
 Restart=on-failure
 User=$(whoami)
 Environment=PATH=/usr/bin:/usr/local/bin
-Environment=PORT=4001
-Environment=VITE_PORT=4000
+Environment=PORT=${PROD_BACKEND_PORT}
+Environment=VITE_PORT=${PROD_FRONTEND_PORT}
 
 [Install]
 WantedBy=multi-user.target
