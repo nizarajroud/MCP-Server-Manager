@@ -95,9 +95,6 @@ const MCPManager = () => {
       return false;
     }
   };
-      return false;
-    }
-  };
 
   const syncLocal = async () => {
     try {
