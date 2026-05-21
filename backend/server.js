@@ -35,8 +35,14 @@ const githubFetch = async (path, options = {}) => {
 };
 
 // GET /api/config — Expose config to frontend
-app.get('/api/config', (req, res) => {
-  res.json({ localBranch: LOCAL_BRANCH, defaultAgent: DEFAULT_AGENT });
+app.get('/api/config', async (req, res) => {
+  let version = '';
+  try {
+    const { default: fs } = await import('fs/promises');
+    const { default: path } = await import('path');
+    version = (await fs.readFile(path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'VERSION'), 'utf-8')).trim();
+  } catch (e) {}
+  res.json({ localBranch: LOCAL_BRANCH, defaultAgent: DEFAULT_AGENT, version });
 });
 
 // GET /api/categories — Get server categories

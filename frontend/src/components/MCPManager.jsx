@@ -19,6 +19,7 @@ const MCPManager = () => {
   const [defaultAgent, setDefaultAgent] = useState('');
   const [categories, setCategories] = useState({});
   const [mainTab, setMainTab] = useState('home');
+  const [version, setVersion] = useState('');
 
   useEffect(() => { loadConfig(); }, []);
   useEffect(() => { if (localBranch) loadBranches(); }, [localBranch]);
@@ -37,6 +38,7 @@ const MCPManager = () => {
       const config = await api.getConfig();
       setLocalBranch(config.localBranch);
       setDefaultAgent(config.defaultAgent);
+      setVersion(config.version);
       const cats = await api.getCategories();
       setCategories(cats);
     } catch (e) {}
@@ -128,7 +130,7 @@ const MCPManager = () => {
       <div className="max-w-6xl mx-auto">
         <header className="mb-6">
           <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-            MCP Server Manager
+            MCP Server Manager {version && <span className="text-lg text-slate-400 font-normal">({version})</span>}
           </h1>
         </header>
 
