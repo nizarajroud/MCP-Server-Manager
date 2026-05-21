@@ -355,6 +355,94 @@ app.put('/api/file', async (req, res) => {
   }
 });
 
+// POST /api/move-server — Move or copy servers between agents
+app.post('/api/move-server', async (req, res) => {
+  try {
+    const { serverNames, sourceAgent, destAgent, branch, mode } = req.body;
+    if (!serverNames?.length || !sourceAgent || !destAgent || !branch) {
+      return res.status(400).json({ error: 'serverNames, sourceAgent, destAgent, branch required' });
+    }
+
+    const getAgentPath = (name) => name === 'Commun' ? LEGACY_MCP_PATH : `agents/${name}.json`;
+
+    // Fetch both agent files
+    const srcPath = getAgentPath(sourceAgent);
+    const destPath = getAgentPath(destAgent);
+
+    const [srcRes, destRes] = await Promise.all([
+      githubFetch(`/contents/${srcPath}?ref=${branch}`),
+      githubFetch(`/contents/${destPath}?ref=${branch}`)
+    ]);
+
+    if (!srcRes.ok || !destRes.ok) {
+      return res.status(404).json({ error: 'Agent file not found' });
+    }
+
+    const srcFile = await srcRes.json();
+    const destFile = await destRes.json();
+    const srcContent = JSON.parse(Buffer.from(srcFile.content, 'base64').toString('utf-8'));
+    const destContent = JSON.parse(Buffer.from(destFile.content, 'base64').toString('utf-8'));
+
+    // Add servers to destination
+    if (!destContent.mcpServers) destContent.mcpServers = {};
+    for (const name of serverNames) {
+      if (srcContent.mcpServers?.[name]) {
+        destContent.mcpServers[name] = srcContent.mcpServers[name];
+      }
+    }
+
+    // Commit destination first
+    const destEncoded = Buffer.from(JSON.stringify(destContent, null, 2)).toString('base64');
+    const destCommit = await githubFetch(`/contents/${destPath}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        message: `feat: ${mode} ${serverNames.join(', ')} to ${destAgent}`,
+        content: destEncoded,
+        sha: destFile.sha,
+        branch
+      })
+    });
+    if (!destCommit.ok) {
+      const err = await destCommit.json();
+      return res.status(500).json({ error: `Dest commit failed: ${err.message}` });
+    }
+
+    // If move, remove from source
+    if (mode === 'move') {
+      for (const name of serverNames) {
+        delete srcContent.mcpServers[name];
+      }
+      // Re-fetch source SHA (may have changed if same file)
+      const srcRefresh = await githubFetch(`/contents/${srcPath}?ref=${branch}`);
+      const srcLatest = await srcRefresh.json();
+
+      const srcEncoded = Buffer.from(JSON.stringify(srcContent, null, 2)).toString('base64');
+      const srcCommit = await githubFetch(`/contents/${srcPath}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          message: `feat: remove ${serverNames.join(', ')} from ${sourceAgent}`,
+          content: srcEncoded,
+          sha: srcLatest.sha,
+          branch
+        })
+      });
+      if (!srcCommit.ok) {
+        const err = await srcCommit.json();
+        return res.status(500).json({ error: `Source commit failed: ${err.message}` });
+      }
+    }
+
+    // Sync local
+    await syncFileToLocal(destPath, branch);
+    if (mode === 'move') await syncFileToLocal(srcPath, branch);
+    await pullLocalRepo(branch);
+
+    res.json({ success: true, moved: serverNames, from: sourceAgent, to: destAgent, mode });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET /api/issues — List open issues from backlog repo
 app.get('/api/issues', async (req, res) => {
   try {

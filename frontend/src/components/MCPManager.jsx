@@ -188,9 +188,12 @@ const MCPManager = () => {
               categories={categories}
               agentContent={agentContent}
               selectedAgent={selectedAgent}
+              selectedBranch={selectedBranch}
+              agents={agents}
               saveToGitHub={saveToGitHub}
               setServers={setServers}
               showNotification={showNotification}
+              reloadAgent={loadAgent}
             />
           )}
 

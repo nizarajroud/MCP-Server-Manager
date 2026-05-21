@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Power, PowerOff, CheckSquare, Square, Edit, Save } from 'lucide-react';
+import { Power, PowerOff, CheckSquare, Square, Edit, Save, ArrowRightLeft } from 'lucide-react';
+import MoveServerModal from './MoveServerModal';
 
-const HomeTab = ({ servers, categories, agentContent, selectedAgent, saveToGitHub, setServers, showNotification }) => {
+const HomeTab = ({ servers, categories, agentContent, selectedAgent, selectedBranch, agents, saveToGitHub, setServers, showNotification, reloadAgent }) => {
   const [selectedServers, setSelectedServers] = useState(new Set());
   const [collapsedCategories, setCollapsedCategories] = useState(new Set([...Object.keys(categories), '📦 Non catégorisé']));
   const [isEditing, setIsEditing] = useState(false);
   const [editedConfig, setEditedConfig] = useState('');
+  const [showMoveModal, setShowMoveModal] = useState(false);
 
   const getServerCategory = (serverName) => {
     for (const [category, serverList] of Object.entries(categories)) {
@@ -95,6 +97,9 @@ const HomeTab = ({ servers, categories, agentContent, selectedAgent, saveToGitHu
         <button onClick={() => toggleSelectionStatus(false)} disabled={selectedServers.size === 0} className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50">
           <PowerOff size={18} /> Désactiver
         </button>
+        <button onClick={() => setShowMoveModal(true)} disabled={selectedServers.size === 0} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50">
+          <ArrowRightLeft size={18} /> Déplacer
+        </button>
       </div>
 
       <div className="space-y-3">
@@ -147,6 +152,26 @@ const HomeTab = ({ servers, categories, agentContent, selectedAgent, saveToGitHu
             <button onClick={() => setIsEditing(false)} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Annuler</button>
           </div>
         </div>
+      )}
+
+      {showMoveModal && (
+        <MoveServerModal
+          serverNames={[...selectedServers]}
+          sourceAgent={selectedAgent}
+          agents={agents}
+          selectedBranch={selectedBranch}
+          onClose={() => setShowMoveModal(false)}
+          onSuccess={(result) => {
+            setShowMoveModal(false);
+            if (result.error) {
+              showNotification(`Erreur: ${result.error}`, 'error');
+            } else {
+              showNotification(`${result.moved.length} serveur(s) ${result.mode === 'move' ? 'déplacé(s)' : 'copié(s)'} vers ${result.to} ✓`);
+              setSelectedServers(new Set());
+              reloadAgent();
+            }
+          }}
+        />
       )}
     </div>
   );
