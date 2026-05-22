@@ -130,8 +130,8 @@ const MCPManager = () => {
     { id: 'home', label: 'Home' },
     { id: 'agents', label: 'Configuration des agents' },
     { id: 'servers', label: 'Configuration serveur MCP' },
-    { id: 'backlog', label: 'Backlog de mise à jour' },
-    { id: 'settings', label: 'Paramètres' }
+    { id: 'settings', label: 'Paramètres' },
+    { id: 'backlog', label: 'Backlog de mise à jour' }
   ];
 
   return (
