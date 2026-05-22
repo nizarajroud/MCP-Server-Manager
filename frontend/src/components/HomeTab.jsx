@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Power, PowerOff, CheckSquare, Square, Edit, Save, GripVertical } from 'lucide-react';
+import { Power, PowerOff, CheckSquare, Square, Edit, Save, GripVertical, ArrowRightLeft } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { api } from '../lib/api';
+import MoveServerModal from './MoveServerModal';
 
-const HomeTab = ({ servers, categories, setCategories, agentContent, selectedAgent, selectedBranch, saveToGitHub, setServers, showNotification }) => {
+const HomeTab = ({ servers, categories, setCategories, agentContent, selectedAgent, selectedBranch, agents, saveToGitHub, setServers, showNotification, reloadAgent }) => {
   const [selectedServers, setSelectedServers] = useState(new Set());
   const [collapsedCategories, setCollapsedCategories] = useState(new Set([...Object.keys(categories), '📦 Non catégorisé']));
   const [isEditing, setIsEditing] = useState(false);
   const [editedConfig, setEditedConfig] = useState('');
+  const [showMoveModal, setShowMoveModal] = useState(false);
 
   const getServerCategory = (serverName) => {
     for (const [category, serverList] of Object.entries(categories)) {
@@ -65,15 +67,10 @@ const HomeTab = ({ servers, categories, setCategories, agentContent, selectedAge
     const newCategory = destination.droppableId;
     const oldCategory = source.droppableId;
 
-    // Update categories locally
     const updated = { ...categories };
-
-    // Remove from old category (if it's a real category, not "Non catégorisé")
     if (oldCategory !== '📦 Non catégorisé' && updated[oldCategory]) {
       updated[oldCategory] = updated[oldCategory].filter(s => s !== serverName);
     }
-
-    // Add to new category (if it's a real category)
     if (newCategory !== '📦 Non catégorisé') {
       if (!updated[newCategory]) updated[newCategory] = [];
       if (!updated[newCategory].includes(serverName)) {
@@ -82,8 +79,6 @@ const HomeTab = ({ servers, categories, setCategories, agentContent, selectedAge
     }
 
     setCategories(updated);
-
-    // Save to GitHub (commit + push + pull rebase)
     try {
       await api.saveCategories(updated, selectedBranch, `feat: move ${serverName} to ${newCategory}`);
       showNotification(`${serverName} → ${newCategory} ✓`);
@@ -133,6 +128,9 @@ const HomeTab = ({ servers, categories, setCategories, agentContent, selectedAge
         </button>
         <button onClick={() => toggleSelectionStatus(false)} disabled={selectedServers.size === 0} className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50">
           <PowerOff size={18} /> Désactiver
+        </button>
+        <button onClick={() => setShowMoveModal(true)} disabled={selectedServers.size === 0} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50">
+          <ArrowRightLeft size={18} /> Déplacer
         </button>
       </div>
 
@@ -202,6 +200,26 @@ const HomeTab = ({ servers, categories, setCategories, agentContent, selectedAge
             <button onClick={() => setIsEditing(false)} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition">Annuler</button>
           </div>
         </div>
+      )}
+
+      {showMoveModal && (
+        <MoveServerModal
+          serverNames={[...selectedServers]}
+          sourceAgent={selectedAgent}
+          agents={agents}
+          selectedBranch={selectedBranch}
+          onClose={() => setShowMoveModal(false)}
+          onSuccess={(result) => {
+            setShowMoveModal(false);
+            if (result.error) {
+              showNotification(`Erreur: ${result.error}`, 'error');
+            } else {
+              showNotification(`${result.moved.length} serveur(s) ${result.mode === 'move' ? 'déplacé(s)' : 'copié(s)'} vers ${result.to} ✓`);
+              setSelectedServers(new Set());
+              reloadAgent();
+            }
+          }}
+        />
       )}
     </div>
   );
