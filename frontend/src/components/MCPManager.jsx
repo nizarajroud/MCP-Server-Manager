@@ -5,6 +5,7 @@ import HomeTab from './HomeTab';
 import AgentConfigTab from './AgentConfigTab';
 import ServerConfigTab from './ServerConfigTab';
 import BacklogTab from './BacklogTab';
+import SettingsTab from './SettingsTab';
 
 const MCPManager = () => {
   const [branches, setBranches] = useState([]);
@@ -24,7 +25,7 @@ const MCPManager = () => {
 
   useEffect(() => { loadConfig(); }, []);
   useEffect(() => { if (localBranch) loadBranches(); }, [localBranch]);
-  useEffect(() => { if (selectedBranch) loadAgents(); }, [selectedBranch, defaultAgent]);
+  useEffect(() => { if (selectedBranch) { loadAgents(); loadCategories(); } }, [selectedBranch, defaultAgent]);
   useEffect(() => { if (selectedAgent) loadAgent(); }, [selectedAgent]);
 
   const isLocalBranch = selectedBranch === localBranch;
@@ -40,7 +41,12 @@ const MCPManager = () => {
       setLocalBranch(config.localBranch);
       setDefaultAgent(config.defaultAgent);
       setVersion(config.version);
-      const cats = await api.getCategories();
+    } catch (e) {}
+  };
+
+  const loadCategories = async () => {
+    try {
+      const cats = await api.getCategories(selectedBranch);
       setCategories(cats);
     } catch (e) {}
   };
@@ -124,7 +130,8 @@ const MCPManager = () => {
     { id: 'home', label: 'Home' },
     { id: 'agents', label: 'Configuration des agents' },
     { id: 'servers', label: 'Configuration serveur MCP' },
-    { id: 'backlog', label: 'Backlog de mise à jour' }
+    { id: 'backlog', label: 'Backlog de mise à jour' },
+    { id: 'settings', label: 'Paramètres' }
   ];
 
   return (
@@ -186,6 +193,7 @@ const MCPManager = () => {
             <HomeTab
               servers={servers}
               categories={categories}
+              setCategories={setCategories}
               agentContent={agentContent}
               selectedAgent={selectedAgent}
               selectedBranch={selectedBranch}
@@ -226,7 +234,16 @@ const MCPManager = () => {
             <BacklogTab showNotification={showNotification} />
           )}
 
-          {!loading && !selectedAgent && mainTab !== 'backlog' && (
+          {!loading && mainTab === 'settings' && (
+            <SettingsTab
+              categories={categories}
+              setCategories={setCategories}
+              selectedBranch={selectedBranch}
+              showNotification={showNotification}
+            />
+          )}
+
+          {!loading && !selectedAgent && !['backlog', 'settings'].includes(mainTab) && (
             <p className="text-slate-400">Sélectionnez un agent pour commencer.</p>
           )}
         </div>

@@ -47,29 +47,59 @@ app.get('/api/config', async (req, res) => {
   res.json({ localBranch: LOCAL_BRANCH, defaultAgent: DEFAULT_AGENT, version });
 });
 
-// GET /api/categories — Get server categories
+const CATEGORIES_PATH = 'settings/categories.json';
+
+// GET /api/categories?branch= — Get server categories from GitHub
 app.get('/api/categories', async (req, res) => {
   try {
-    const { default: fs } = await import('fs/promises');
-    const { default: path } = await import('path');
-    const { default: os } = await import('os');
-    const filePath = path.join(os.homedir(), '.kiro', 'categories.json');
-    const content = await fs.readFile(filePath, 'utf-8');
-    res.json(JSON.parse(content));
+    const branch = req.query.branch || LOCAL_BRANCH;
+    const response = await githubFetch(`/contents/${CATEGORIES_PATH}?ref=${branch}`);
+    if (!response.ok) return res.json({});
+    const file = await response.json();
+    const content = JSON.parse(Buffer.from(file.content, 'base64').toString('utf-8'));
+    res.json(content);
   } catch (e) {
     res.json({});
   }
 });
 
-// PUT /api/categories — Update server categories
+// PUT /api/categories — Rebase + Commit + Push + Pull categories
 app.put('/api/categories', async (req, res) => {
   try {
-    const { default: fs } = await import('fs/promises');
-    const { default: path } = await import('path');
-    const { default: os } = await import('os');
-    const filePath = path.join(os.homedir(), '.kiro', 'categories.json');
-    await fs.writeFile(filePath, JSON.stringify(req.body, null, 2));
-    res.json({ success: true });
+    const { categories, branch, message } = req.body;
+    if (!categories || !branch) return res.status(400).json({ error: 'categories and branch required' });
+
+    // 1. REBASE: fetch latest SHA
+    const latestRes = await githubFetch(`/contents/${CATEGORIES_PATH}?ref=${branch}`);
+    let sha = null;
+    if (latestRes.ok) {
+      const latestFile = await latestRes.json();
+      sha = latestFile.sha;
+    }
+
+    // 2. COMMIT + PUSH
+    const encoded = Buffer.from(JSON.stringify(categories, null, 2)).toString('base64');
+    const response = await githubFetch(`/contents/${CATEGORIES_PATH}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        message: message || 'feat: update categories',
+        content: encoded,
+        sha,
+        branch
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      return res.status(response.status).json({ error: err.message });
+    }
+
+    const result = await response.json();
+
+    // 3. GIT PULL: sync local repo
+    await pullLocalRepo(branch);
+
+    res.json({ success: true, sha: result.content.sha });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

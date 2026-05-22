@@ -6,17 +6,21 @@ export const api = {
     return res.json();
   },
 
-  async getCategories() {
-    const res = await fetch(`${API_URL}/api/categories`);
+  async getCategories(branch) {
+    const res = await fetch(`${API_URL}/api/categories${branch ? `?branch=${branch}` : ''}`);
     return res.json();
   },
 
-  async saveCategories(categories) {
+  async saveCategories(categories, branch, message) {
     const res = await fetch(`${API_URL}/api/categories`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(categories)
+      body: JSON.stringify({ categories, branch, message })
     });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || 'Save categories failed');
+    }
     return res.json();
   },
 

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Power, PowerOff, CheckSquare, Square, Edit, Save, ArrowRightLeft } from 'lucide-react';
+import { Power, PowerOff, CheckSquare, Square, Edit, Save, GripVertical, ArrowRightLeft } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { api } from '../lib/api';
 import MoveServerModal from './MoveServerModal';
 
-const HomeTab = ({ servers, categories, agentContent, selectedAgent, selectedBranch, agents, saveToGitHub, setServers, showNotification, reloadAgent }) => {
+const HomeTab = ({ servers, categories, setCategories, agentContent, selectedAgent, selectedBranch, agents, saveToGitHub, setServers, showNotification, reloadAgent }) => {
   const [selectedServers, setSelectedServers] = useState(new Set());
   const [collapsedCategories, setCollapsedCategories] = useState(new Set([...Object.keys(categories), '📦 Non catégorisé']));
   const [isEditing, setIsEditing] = useState(false);
@@ -57,6 +59,34 @@ const HomeTab = ({ servers, categories, agentContent, selectedAgent, selectedBra
     if (success) setServers(Object.entries(mcpServers).map(([name, config]) => ({ name, ...config })));
   };
 
+  const onDragEnd = async (result) => {
+    const { draggableId, destination, source } = result;
+    if (!destination || destination.droppableId === source.droppableId) return;
+
+    const serverName = draggableId;
+    const newCategory = destination.droppableId;
+    const oldCategory = source.droppableId;
+
+    const updated = { ...categories };
+    if (oldCategory !== '📦 Non catégorisé' && updated[oldCategory]) {
+      updated[oldCategory] = updated[oldCategory].filter(s => s !== serverName);
+    }
+    if (newCategory !== '📦 Non catégorisé') {
+      if (!updated[newCategory]) updated[newCategory] = [];
+      if (!updated[newCategory].includes(serverName)) {
+        updated[newCategory].push(serverName);
+      }
+    }
+
+    setCategories(updated);
+    try {
+      await api.saveCategories(updated, selectedBranch, `feat: move ${serverName} to ${newCategory}`);
+      showNotification(`${serverName} → ${newCategory} ✓`);
+    } catch (e) {
+      showNotification(`Erreur: ${e.message}`, 'error');
+    }
+  };
+
   const startEditing = () => {
     const formatted = Object.entries(agentContent.mcpServers)
       .filter(([name]) => selectedServers.has(name))
@@ -84,6 +114,8 @@ const HomeTab = ({ servers, categories, agentContent, selectedAgent, selectedBra
     }
   };
 
+  const grouped = getGroupedServers();
+
   return (
     <div className="space-y-4">
       <div className="flex gap-2 mb-4">
@@ -102,39 +134,55 @@ const HomeTab = ({ servers, categories, agentContent, selectedAgent, selectedBra
         </button>
       </div>
 
-      <div className="space-y-3">
-        {Object.entries(getGroupedServers()).map(([category, categoryServers]) => (
-          <div key={category} className="border border-slate-600 rounded-lg overflow-hidden">
-            <button onClick={() => toggleCategory(category)} className="w-full flex items-center justify-between px-4 py-2 bg-slate-700/80 hover:bg-slate-700 transition">
-              <span className="font-semibold">{category}</span>
-              <span className="text-slate-400">{collapsedCategories.has(category) ? '▶' : '▼'}</span>
-            </button>
-            {!collapsedCategories.has(category) && (
-              <div className="space-y-1 p-2">
-                {categoryServers.map(server => (
-                  <div key={server.name} className="bg-slate-700/50 p-2 rounded border border-slate-600 hover:border-purple-500 transition">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3 flex-1">
-                        <button onClick={() => {
-                          const s = new Set(selectedServers);
-                          s.has(server.name) ? s.delete(server.name) : s.add(server.name);
-                          setSelectedServers(s);
-                        }}>
-                          {selectedServers.has(server.name) ? <CheckSquare size={18} className="text-purple-400" /> : <Square size={18} className="text-slate-500" />}
-                        </button>
-                        <h3 className="text-sm">{server.name}</h3>
-                      </div>
-                      <button onClick={() => toggleServerStatus(server.name)} className={`transition ml-2 ${server.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
-                        {server.disabled ? <PowerOff size={16} /> : <Power size={16} />}
-                      </button>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="space-y-3">
+          {Object.entries(grouped).map(([category, categoryServers]) => (
+            <div key={category} className="border border-slate-600 rounded-lg overflow-hidden">
+              <button onClick={() => toggleCategory(category)} className="w-full flex items-center justify-between px-4 py-2 bg-slate-700/80 hover:bg-slate-700 transition">
+                <span className="font-semibold">{category} <span className="text-slate-400 text-sm">({categoryServers.length})</span></span>
+                <span className="text-slate-400">{collapsedCategories.has(category) ? '▶' : '▼'}</span>
+              </button>
+              {!collapsedCategories.has(category) && (
+                <Droppable droppableId={category}>
+                  {(provided, snapshot) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps}
+                      className={`space-y-1 p-2 min-h-[40px] transition ${snapshot.isDraggingOver ? 'bg-purple-500/10' : ''}`}>
+                      {categoryServers.map((server, index) => (
+                        <Draggable key={server.name} draggableId={server.name} index={index}>
+                          {(provided, snapshot) => (
+                            <div ref={provided.innerRef} {...provided.draggableProps}
+                              className={`bg-slate-700/50 p-2 rounded border transition ${snapshot.isDragging ? 'border-purple-400 shadow-lg shadow-purple-500/20' : 'border-slate-600 hover:border-purple-500'}`}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <span {...provided.dragHandleProps} className="text-slate-500 hover:text-slate-300 cursor-grab">
+                                    <GripVertical size={14} />
+                                  </span>
+                                  <button onClick={() => {
+                                    const s = new Set(selectedServers);
+                                    s.has(server.name) ? s.delete(server.name) : s.add(server.name);
+                                    setSelectedServers(s);
+                                  }}>
+                                    {selectedServers.has(server.name) ? <CheckSquare size={18} className="text-purple-400" /> : <Square size={18} className="text-slate-500" />}
+                                  </button>
+                                  <h3 className="text-sm">{server.name}</h3>
+                                </div>
+                                <button onClick={() => toggleServerStatus(server.name)} className={`transition ml-2 ${server.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
+                                  {server.disabled ? <PowerOff size={16} /> : <Power size={16} />}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+                  )}
+                </Droppable>
+              )}
+            </div>
+          ))}
+        </div>
+      </DragDropContext>
 
       {selectedServers.size > 0 && !isEditing && (
         <button onClick={startEditing} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition flex items-center gap-2">
