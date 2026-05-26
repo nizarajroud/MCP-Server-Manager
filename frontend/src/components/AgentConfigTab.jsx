@@ -11,6 +11,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
   const [subTab, setSubTab] = useState('general');
   const [deploySort, setDeploySort] = useState({ key: null, asc: true });
   const [deploySearch, setDeploySearch] = useState('');
+  const [deploySelected, setDeploySelected] = useState(new Set());
   const [form, setForm] = useState({ name: '', description: '', welcomeMessage: '' });
   const [promptContent, setPromptContent] = useState('');
   const [promptFilePath, setPromptFilePath] = useState('');
@@ -233,10 +234,64 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-64"
             />
           </div>
+          {deploySelected.size > 0 && (
+            <div className="flex items-center gap-3 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600">
+              <span className="text-sm text-slate-300">☑ {deploySelected.size} sélectionné{deploySelected.size > 1 ? 's' : ''}</span>
+              <button onClick={async () => {
+                const mcpServers = { ...agentContent.mcpServers };
+                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], disabled: false };
+                await saveToGitHub(mcpServers, `feat: enable ${deploySelected.size} servers`);
+              }} className="px-3 py-1 bg-green-600 hover:bg-green-500 rounded text-xs active:scale-90 transition-transform">🟢 Activer</button>
+              <button onClick={async () => {
+                const mcpServers = { ...agentContent.mcpServers };
+                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], disabled: true };
+                await saveToGitHub(mcpServers, `feat: disable ${deploySelected.size} servers`);
+              }} className="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-xs active:scale-90 transition-transform">🔴 Désactiver</button>
+              <button onClick={async () => {
+                for (const n of deploySelected) {
+                  await api.updateServerTarget(n, 'pcalt', selectedBranch);
+                }
+                const mcpServers = { ...agentContent.mcpServers };
+                const regData = await api.getServersRegistry(selectedBranch);
+                for (const n of deploySelected) {
+                  const r = regData[n];
+                  if (r && r.port) {
+                    const cfg = mcpServers[n];
+                    if (!(cfg.args && cfg.args.includes('mcp-remote'))) {
+                      mcpServers[n] = { ...cfg, _original: { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://192.168.2.56:${r.port}/mcp`, '--allow-http'], disabled: false };
+                    }
+                  }
+                }
+                await saveToGitHub(mcpServers, `feat: move ${deploySelected.size} servers to pcalt`);
+                reloadRegistry(); reloadHealth();
+              }} className="px-3 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs active:scale-90 transition-transform">💻 → pcalt</button>
+              <button onClick={async () => {
+                for (const n of deploySelected) {
+                  await api.updateServerTarget(n, 'envy', selectedBranch);
+                }
+                const mcpServers = { ...agentContent.mcpServers };
+                for (const n of deploySelected) {
+                  const cfg = mcpServers[n];
+                  if (cfg._original) {
+                    mcpServers[n] = { ...cfg, command: cfg._original.command, args: cfg._original.args, disabled: false };
+                    delete mcpServers[n]._original;
+                  }
+                }
+                await saveToGitHub(mcpServers, `feat: move ${deploySelected.size} servers to local`);
+                reloadRegistry(); reloadHealth();
+              }} className="px-3 py-1 bg-slate-600 hover:bg-slate-500 rounded text-xs active:scale-90 transition-transform">📦 → Local</button>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-700 text-slate-500 text-xs uppercase">
+                  <th className="py-1 px-2" rowSpan="2">
+                    <input type="checkbox" onChange={(e) => {
+                      const all = Object.keys(agentContent.mcpServers || {});
+                      setDeploySelected(e.target.checked ? new Set(all) : new Set());
+                    }} checked={deploySelected.size > 0 && deploySelected.size === Object.keys(agentContent.mcpServers || {}).length} className="accent-purple-500" />
+                  </th>
                   <th className="text-left py-1 px-3" rowSpan="2"></th>
                   <th className="text-center py-1 px-3 border-l border-slate-700" colSpan="2">Client</th>
                   <th className="text-center py-1 px-3 border-l border-slate-700" colSpan="3">Serveur</th>
@@ -272,6 +327,13 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   const clientAligned = (isInternet) || (isRemote && reg && reg.target !== 'envy') || (!isRemote && (!reg || reg.target === 'envy'));
                   return (
                     <tr key={name} className={`border-b border-slate-700/50 hover:bg-slate-700/30 ${!clientAligned ? 'bg-yellow-900/10' : ''}`}>
+                      <td className="py-2 px-2">
+                        <input type="checkbox" checked={deploySelected.has(name)} onChange={() => {
+                          const s = new Set(deploySelected);
+                          s.has(name) ? s.delete(name) : s.add(name);
+                          setDeploySelected(s);
+                        }} className="accent-purple-500" />
+                      </td>
                       <td className="py-2 px-3 font-medium">{name}</td>
                       <td className="py-2 px-3 border-l border-slate-700">
                         <button onClick={async () => {
