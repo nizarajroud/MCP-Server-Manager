@@ -47,38 +47,43 @@ fi
 pkill -f supergateway 2>/dev/null || true
 sleep 1
 
-# Read agent configs to get the actual command for each server
+# Read agent config to get the actual command for each server
+# Use the default agent (exp2) as source of truth
 KIRO_CONFIGS="${REMOTE_KIRO_CONFIGS:-${HOME}/HomeWspce/kiro-configs}"
-AGENT_FILES=$(find "${KIRO_CONFIGS}/agents" -name "*.json" 2>/dev/null)
-MCP_JSON="${KIRO_CONFIGS}/settings/mcp.json"
+DEFAULT_AGENT="${DEFAULT_AGENT:-exp2}"
+AGENT_FILE="${KIRO_CONFIGS}/agents/${DEFAULT_AGENT}.json"
 
-# Lookup command+args across all agent files + mcp.json
-find_server_cmd() {
-    local server="$1"
-    for f in "$MCP_JSON" $AGENT_FILES; do
-        local cmd=$(jq -r ".mcpServers.\"${server}\".command // empty" "$f" 2>/dev/null)
-        if [ -n "$cmd" ]; then
-            local args=$(jq -r ".mcpServers.\"${server}\".args // [] | join(\" \")" "$f" 2>/dev/null)
-            echo "${cmd} ${args}"
-            return
-        fi
-    done
-}
+if [ ! -f "$AGENT_FILE" ]; then
+    echo "❌ Agent file not found: $AGENT_FILE"
+    exit 1
+fi
+
+# Load environment variables (API keys, tokens)
+KIRO_ENV="${KIRO_CONFIGS}/.env"
+if [ -f "$KIRO_ENV" ]; then
+    set -a
+    source "$KIRO_ENV"
+    set +a
+    echo "  ✓ Loaded env from ${KIRO_ENV}"
+fi
 
 for SERVER in $SERVERS; do
     PORT_OFFSET=$(yq -r ".servers.\"${SERVER}\".port_offset" "$SERVERS_YAML")
     PORT=$((BASE_PORT + PORT_OFFSET))
 
-    STDIO_CMD=$(find_server_cmd "$SERVER")
+    CMD=$(jq -r ".mcpServers.\"${SERVER}\"._original.command // .mcpServers.\"${SERVER}\".command // empty" "$AGENT_FILE" 2>/dev/null)
+    ARGS=$(jq -r ".mcpServers.\"${SERVER}\"._original.args // .mcpServers.\"${SERVER}\".args // [] | join(\" \")" "$AGENT_FILE" 2>/dev/null)
 
-    if [ -z "$STDIO_CMD" ]; then
-        echo "  ⚠️  ${SERVER}: not found in any agent config, skipping"
+    if [ -z "$CMD" ]; then
+        echo "  ⚠️  ${SERVER}: not found in ${DEFAULT_AGENT}.json, skipping"
         continue
     fi
+
+    STDIO_CMD="${CMD} ${ARGS}"
     LOG_FILE="${LOG_DIR}/mcp-${SERVER}.log"
 
     echo "  → ${SERVER} on :${PORT} (${STDIO_CMD})"
-    nohup ${SUPERGATEWAY_CMD} --stdio "${STDIO_CMD}" --port ${PORT} > "${LOG_FILE}" 2>&1 &
+    nohup ${SUPERGATEWAY_CMD} --stdio "${STDIO_CMD}" --port ${PORT} --outputTransport streamableHttp > "${LOG_FILE}" 2>&1 &
     sleep 1
 done
 

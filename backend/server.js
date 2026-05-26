@@ -8,7 +8,6 @@ const GITHUB_REPO = process.env.GITHUB_REPO || 'nizarajroud/kiro-configs';
 const GITHUB_API = 'https://api.github.com';
 const LOCAL_BRANCH = process.env.LOCAL_BRANCH || 'personal-branch';
 const DEFAULT_AGENT = process.env.DEFAULT_AGENT || 'exp2';
-const LEGACY_MCP_PATH = process.env.LEGACY_MCP_PATH || 'settings/mcp.json';
 const LOCAL_REPO_PATH = process.env.LOCAL_REPO_PATH || '/home/nizar/HomeWspce/kiro-configs';
 const BACKLOG_REPO = process.env.BACKLOG_REPO || 'nizarajroud/MCP-Server-Manager';
 const BACKLOG_LABEL = process.env.BACKLOG_LABEL || 'backlog';
@@ -126,8 +125,6 @@ app.get('/api/agents', async (req, res) => {
     const agents = files
       .filter(f => f.name.endsWith('.json') && !f.name.includes('example'))
       .map(f => ({ name: f.name.replace('.json', ''), path: f.path, sha: f.sha }));
-    // Ajouter l'agent "Commun" (mcp.json)
-    agents.unshift({ name: 'Commun', path: LEGACY_MCP_PATH, sha: null, isLegacy: true });
     res.json(agents);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -138,15 +135,6 @@ app.get('/api/agents', async (req, res) => {
 app.get('/api/agent/:name', async (req, res) => {
   try {
     const branch = req.query.branch || 'main';
-    
-    // Cas spécial pour l'agent "Commun"
-    if (req.params.name === 'Commun') {
-      const response = await githubFetch(`/contents/${LEGACY_MCP_PATH}?ref=${branch}`);
-      const file = await response.json();
-      const content = JSON.parse(Buffer.from(file.content, 'base64').toString('utf-8'));
-      res.json({ content, sha: file.sha });
-      return;
-    }
     
     const response = await githubFetch(`/contents/agents/${req.params.name}.json?ref=${branch}`);
     const file = await response.json();
@@ -201,9 +189,7 @@ app.put('/api/agent/:name', async (req, res) => {
     }
 
     // Déterminer le chemin selon l'agent
-    const filePath = req.params.name === 'Commun' 
-      ? LEGACY_MCP_PATH 
-      : `agents/${req.params.name}.json`;
+    const filePath = `agents/${req.params.name}.json`;
     const commitMessage = message || `feat: update ${req.params.name} config`;
 
     // 1. REBASE: Fetch latest SHA (pull latest)
@@ -233,8 +219,8 @@ app.put('/api/agent/:name', async (req, res) => {
 
     const result = await response.json();
 
-    // 3. SYNC LOCAL: Download updated file to ~/.kiro/agents/ (skip Commun — git pull handles it)
-    const localPath = req.params.name !== 'Commun' ? await syncFileToLocal(filePath, branch) : null;
+    // 3. SYNC LOCAL: Download updated file to ~/.kiro/agents/
+    const localPath = await syncFileToLocal(filePath, branch);
 
     // 4. GIT PULL: Sync local repo with remote
     await pullLocalRepo(branch);
@@ -452,7 +438,7 @@ app.post('/api/apply-remote-config', async (req, res) => {
     const serversYaml = parsed.servers || {};
 
     // Load agent JSON
-    const filePath = agent === 'Commun' ? LEGACY_MCP_PATH : `agents/${agent}.json`;
+    const filePath = `agents/${agent}.json`;
     const agentRes = await githubFetch(`/contents/${filePath}?ref=${branch}`);
     if (!agentRes.ok) return res.status(404).json({ error: 'Agent not found' });
     const agentFile = await agentRes.json();
@@ -467,7 +453,7 @@ app.post('/api/apply-remote-config', async (req, res) => {
       const machine = machines[srv.target];
       if (!machine || !machine.base_port) continue;
       const port = machine.base_port + (srv.port_offset || 0);
-      const url = `http://${machine.host}:${port}/sse`;
+      const url = `http://${machine.host}:${port}/mcp`;
       // Only transform if not already mcp-remote
       if (config.args && config.args.includes('mcp-remote')) continue;
       // Store original config for restore
@@ -501,7 +487,7 @@ app.post('/api/apply-remote-config', async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    if (agent !== 'Commun') await syncFileToLocal(filePath, branch);
+    await syncFileToLocal(filePath, branch);
     await pullLocalRepo(branch);
 
     res.json({ success: true, changed });
@@ -516,7 +502,7 @@ app.post('/api/restore-local-config', async (req, res) => {
     const { agent, branch } = req.body;
     if (!agent || !branch) return res.status(400).json({ error: 'agent and branch required' });
 
-    const filePath = agent === 'Commun' ? LEGACY_MCP_PATH : `agents/${agent}.json`;
+    const filePath = `agents/${agent}.json`;
     const agentRes = await githubFetch(`/contents/${filePath}?ref=${branch}`);
     if (!agentRes.ok) return res.status(404).json({ error: 'Agent not found' });
     const agentFile = await agentRes.json();
@@ -552,7 +538,7 @@ app.post('/api/restore-local-config', async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    if (agent !== 'Commun') await syncFileToLocal(filePath, branch);
+    await syncFileToLocal(filePath, branch);
     await pullLocalRepo(branch);
 
     res.json({ success: true, changed });
@@ -569,7 +555,7 @@ app.post('/api/move-server', async (req, res) => {
       return res.status(400).json({ error: 'serverNames, sourceAgent, destAgent, branch required' });
     }
 
-    const getAgentPath = (name) => name === 'Commun' ? LEGACY_MCP_PATH : `agents/${name}.json`;
+    const getAgentPath = (name) => `agents/${name}.json`;
     const srcPath = getAgentPath(sourceAgent);
     const destPath = getAgentPath(destAgent);
 
@@ -641,9 +627,9 @@ app.post('/api/move-server', async (req, res) => {
       }
     }
 
-    // 3. SYNC LOCAL: only for non-Commun agents (Commun lives in settings/, git pull handles it)
-    if (destAgent !== 'Commun') await syncFileToLocal(destPath, branch);
-    if (mode === 'move' && sourceAgent !== 'Commun') await syncFileToLocal(srcPath, branch);
+    // 3. SYNC LOCAL
+    await syncFileToLocal(destPath, branch);
+    if (mode === 'move') await syncFileToLocal(srcPath, branch);
 
     // 4. GIT PULL: sync local repo
     await pullLocalRepo(branch);
