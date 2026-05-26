@@ -220,8 +220,8 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   <th className="text-center py-1 px-3 border-l border-slate-700" colSpan="3">Serveur</th>
                 </tr>
                 <tr className="border-b border-slate-600 text-slate-400">
-                  <th className="text-left py-2 px-3 border-l border-slate-700">Config</th>
-                  <th className="text-left py-2 px-3 border-l border-slate-700">Cible</th>
+                  <th className="text-left py-2 px-3 border-l border-slate-700">Accès</th>
+                  <th className="text-left py-2 px-3 border-l border-slate-700">Ressource</th>
                   <th className="text-left py-2 px-3">Port</th>
                   <th className="text-left py-2 px-3">Santé</th>
                 </tr>
