@@ -258,13 +258,15 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 const mcpServers = { ...agentContent.mcpServers };
                 for (const n of deploySelected) {
                   const r = regData[n];
-                  if (r && r.port) {
-                    const cfg = mcpServers[n];
-                    if (!(cfg.args && cfg.args.includes('mcp-remote'))) {
-                      mcpServers[n] = { ...cfg, _original: { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false };
-                    } else {
-                      mcpServers[n] = { ...cfg, disabled: false };
-                    }
+                  const cfg = mcpServers[n];
+                  if (r && r.port && cfg) {
+                    mcpServers[n] = {
+                      ...cfg,
+                      _original: cfg._original || { command: cfg.command, args: cfg.args },
+                      command: 'npx',
+                      args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'],
+                      disabled: false
+                    };
                   }
                 }
                 await saveToGitHub(mcpServers, `feat: move ${deploySelected.size} servers to pcalt`);
