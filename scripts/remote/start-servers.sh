@@ -71,8 +71,8 @@ for SERVER in $SERVERS; do
     PORT_OFFSET=$(yq -r ".servers.\"${SERVER}\".port_offset" "$SERVERS_YAML")
     PORT=$((BASE_PORT + PORT_OFFSET))
 
-    CMD=$(jq -r ".mcpServers.\"${SERVER}\".command // empty" "$AGENT_FILE" 2>/dev/null)
-    ARGS=$(jq -r ".mcpServers.\"${SERVER}\".args // [] | join(\" \")" "$AGENT_FILE" 2>/dev/null)
+    CMD=$(jq -r ".mcpServers.\"${SERVER}\"._original.command // .mcpServers.\"${SERVER}\".command // empty" "$AGENT_FILE" 2>/dev/null)
+    ARGS=$(jq -r ".mcpServers.\"${SERVER}\"._original.args // .mcpServers.\"${SERVER}\".args // [] | join(\" \")" "$AGENT_FILE" 2>/dev/null)
 
     if [ -z "$CMD" ]; then
         echo "  ⚠️  ${SERVER}: not found in ${DEFAULT_AGENT}.json, skipping"
