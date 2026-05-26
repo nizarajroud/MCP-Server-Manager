@@ -10,6 +10,7 @@ const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, registry, health, saveToGitHub, showNotification, reloadAgent, api }) => {
   const [subTab, setSubTab] = useState('general');
   const [deploySort, setDeploySort] = useState({ key: null, asc: true });
+  const [deploySearch, setDeploySearch] = useState('');
   const [form, setForm] = useState({ name: '', description: '', welcomeMessage: '' });
   const [promptContent, setPromptContent] = useState('');
   const [promptFilePath, setPromptFilePath] = useState('');
@@ -210,8 +211,28 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
         </div>
       )}
 
-      {subTab === 'deploy' && (
+      {subTab === 'deploy' && (() => {
+        const allServers = Object.keys(agentContent.mcpServers || {});
+        const totalDirect = allServers.filter(n => { const c = agentContent.mcpServers[n]; return !(c.args && c.args.includes('mcp-remote')); }).length;
+        const totalRemote = allServers.length - totalDirect;
+        const totalEnabled = allServers.filter(n => !agentContent.mcpServers[n].disabled).length;
+        return (
         <div className="space-y-4">
+          <div className="flex gap-4 items-center flex-wrap">
+            <div className="flex gap-3 text-sm">
+              <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
+              <span className="px-2 py-1 bg-slate-700 rounded">📦 Direct: <strong>{totalDirect}</strong></span>
+              <span className="px-2 py-1 bg-blue-900/50 rounded text-blue-300">🌐 Remote: <strong>{totalRemote}</strong></span>
+              <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">✓ Actifs: <strong>{totalEnabled}</strong></span>
+            </div>
+            <input
+              type="text"
+              placeholder="Rechercher un serveur..."
+              value={deploySearch || ''}
+              onChange={e => setDeploySearch(e.target.value)}
+              className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-64"
+            />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -229,7 +250,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 </tr>
               </thead>
               <tbody>
-                {Object.keys(agentContent.mcpServers || {}).map(name => {
+                {Object.keys(agentContent.mcpServers || {}).filter(name => !deploySearch || name.toLowerCase().includes(deploySearch.toLowerCase())).map(name => {
                   const reg = registry[name];
                   const cfg = agentContent.mcpServers[name];
                   const isRemote = cfg.args && cfg.args.includes('mcp-remote');
@@ -311,7 +332,8 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             </button>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
