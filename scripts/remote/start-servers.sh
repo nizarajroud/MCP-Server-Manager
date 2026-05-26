@@ -58,6 +58,15 @@ if [ ! -f "$AGENT_FILE" ]; then
     exit 1
 fi
 
+# Load environment variables (API keys, tokens)
+KIRO_ENV="${KIRO_CONFIGS}/.env"
+if [ -f "$KIRO_ENV" ]; then
+    set -a
+    source "$KIRO_ENV"
+    set +a
+    echo "  ✓ Loaded env from ${KIRO_ENV}"
+fi
+
 for SERVER in $SERVERS; do
     PORT_OFFSET=$(yq -r ".servers.\"${SERVER}\".port_offset" "$SERVERS_YAML")
     PORT=$((BASE_PORT + PORT_OFFSET))
