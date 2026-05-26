@@ -7,7 +7,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, registry, health, saveToGitHub, showNotification, reloadAgent, api }) => {
+const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, registry, health, saveToGitHub, showNotification, reloadAgent, reloadRegistry, api }) => {
   const [subTab, setSubTab] = useState('general');
   const [deploySort, setDeploySort] = useState({ key: null, asc: true });
   const [deploySearch, setDeploySearch] = useState('');
@@ -299,6 +299,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                               const target = e.target.value === 'local' ? 'envy' : e.target.value;
                               await api.updateServerTarget(name, target, selectedBranch);
                               showNotification(`${name} → ${e.target.value} ✓`);
+                              reloadRegistry();
                             } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
                           }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">
                             <option value="local">📦 Local</option>

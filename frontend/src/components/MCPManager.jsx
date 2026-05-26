@@ -235,6 +235,7 @@ const MCPManager = () => {
               saveToGitHub={saveToGitHub}
               showNotification={showNotification}
               reloadAgent={loadAgent}
+              reloadRegistry={loadRegistry}
               api={api}
             />
           )}
