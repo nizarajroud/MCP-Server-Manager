@@ -241,29 +241,35 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 const mcpServers = { ...agentContent.mcpServers };
                 for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], disabled: false };
                 await saveToGitHub(mcpServers, `feat: enable ${deploySelected.size} servers`);
+                setDeploySelected(new Set());
               }} className="px-3 py-1 bg-green-600 hover:bg-green-500 rounded text-xs active:scale-90 transition-transform">🟢 Activer</button>
               <button onClick={async () => {
                 const mcpServers = { ...agentContent.mcpServers };
                 for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], disabled: true };
                 await saveToGitHub(mcpServers, `feat: disable ${deploySelected.size} servers`);
+                setDeploySelected(new Set());
               }} className="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-xs active:scale-90 transition-transform">🔴 Désactiver</button>
               <button onClick={async () => {
                 for (const n of deploySelected) {
                   await api.updateServerTarget(n, 'pcalt', selectedBranch);
                 }
-                const mcpServers = { ...agentContent.mcpServers };
                 const regData = await api.getServersRegistry(selectedBranch);
+                const mcpServers = { ...agentContent.mcpServers };
                 for (const n of deploySelected) {
                   const r = regData[n];
                   if (r && r.port) {
                     const cfg = mcpServers[n];
                     if (!(cfg.args && cfg.args.includes('mcp-remote'))) {
-                      mcpServers[n] = { ...cfg, _original: { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://192.168.2.56:${r.port}/mcp`, '--allow-http'], disabled: false };
+                      mcpServers[n] = { ...cfg, _original: { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false };
+                    } else {
+                      mcpServers[n] = { ...cfg, disabled: false };
                     }
                   }
                 }
                 await saveToGitHub(mcpServers, `feat: move ${deploySelected.size} servers to pcalt`);
-                reloadRegistry(); reloadHealth();
+                await reloadRegistry();
+                await reloadHealth();
+                setDeploySelected(new Set());
               }} className="px-3 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs active:scale-90 transition-transform">💻 → pcalt</button>
               <button onClick={async () => {
                 for (const n of deploySelected) {
@@ -275,10 +281,14 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   if (cfg._original) {
                     mcpServers[n] = { ...cfg, command: cfg._original.command, args: cfg._original.args, disabled: false };
                     delete mcpServers[n]._original;
+                  } else {
+                    mcpServers[n] = { ...cfg, disabled: false };
                   }
                 }
                 await saveToGitHub(mcpServers, `feat: move ${deploySelected.size} servers to local`);
-                reloadRegistry(); reloadHealth();
+                await reloadRegistry();
+                await reloadHealth();
+                setDeploySelected(new Set());
               }} className="px-3 py-1 bg-slate-600 hover:bg-slate-500 rounded text-xs active:scale-90 transition-transform">📦 → Local</button>
             </div>
           )}
