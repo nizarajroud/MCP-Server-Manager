@@ -291,13 +291,20 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                         </span>
                       </td>
                       <td className="py-2 px-3 border-l border-slate-700">
-                        {(() => {
-                          if (!isRemote) return <span className="text-slate-500">—</span>;
-                          const isInternet = cfg?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
-                          if (isInternet) return <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>;
-                          if (reg && reg.target !== 'envy') return <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">💻 {reg.target}</span>;
-                          return <span className="text-slate-500">—</span>;
-                        })()}
+                        {isInternet ? (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>
+                        ) : (
+                          <select value={reg?.target || 'envy'} onChange={async (e) => {
+                            try {
+                              await api.updateServerTarget(name, e.target.value, selectedBranch);
+                              showNotification(`${name} → ${e.target.value} ✓`);
+                              reloadAgent();
+                            } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
+                          }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">
+                            <option value="envy">📦 local</option>
+                            <option value="pcalt">💻 pcalt</option>
+                          </select>
+                        )}
                       </td>
                       <td className="py-2 px-3 text-slate-400">{reg?.port || '—'}</td>
                       <td className="py-2 px-3">

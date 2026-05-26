@@ -401,6 +401,66 @@ app.get('/api/servers-registry', async (req, res) => {
   }
 });
 
+// PUT /api/servers-registry — Update a server's target in servers.yaml
+app.put('/api/servers-registry', async (req, res) => {
+  try {
+    const { serverName, target, branch } = req.body;
+    if (!serverName || !target || !branch) return res.status(400).json({ error: 'serverName, target, branch required' });
+
+    // Fetch current servers.yaml
+    const response = await githubFetch(`/contents/${SERVERS_YAML_PATH}?ref=${branch}`);
+    if (!response.ok) return res.status(404).json({ error: 'servers.yaml not found' });
+    const file = await response.json();
+    const content = Buffer.from(file.content, 'base64').toString('utf-8');
+    const parsed = yaml.load(content);
+
+    // Update target
+    if (!parsed.servers) parsed.servers = {};
+    if (!parsed.servers[serverName]) {
+      parsed.servers[serverName] = { target, port_offset: Object.values(parsed.servers).filter(s => s.target === target).length };
+    } else {
+      parsed.servers[serverName].target = target;
+    }
+
+    // If moving to envy (local), remove port_offset
+    if (target === 'envy') {
+      delete parsed.servers[serverName].port_offset;
+      parsed.servers[serverName].reason = 'Local';
+    } else if (parsed.servers[serverName].port_offset === undefined) {
+      // Assign next available port_offset for this machine
+      const usedOffsets = Object.values(parsed.servers).filter(s => s.target === target && s.port_offset !== undefined).map(s => s.port_offset);
+      parsed.servers[serverName].port_offset = usedOffsets.length > 0 ? Math.max(...usedOffsets) + 1 : 0;
+    }
+
+    // Commit updated yaml
+    const latestRes = await githubFetch(`/contents/${SERVERS_YAML_PATH}?ref=${branch}`);
+    const latest = await latestRes.json();
+    const encoded = Buffer.from(yaml.dump(parsed, { lineWidth: -1 })).toString('base64');
+    const commitRes = await githubFetch(`/contents/${SERVERS_YAML_PATH}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        message: `feat: move ${serverName} to ${target}`,
+        content: encoded,
+        sha: latest.sha,
+        branch
+      })
+    });
+    if (!commitRes.ok) {
+      const err = await commitRes.json();
+      return res.status(500).json({ error: err.message });
+    }
+
+    await pullLocalRepo(branch);
+
+    // Return updated registry entry
+    const machine = parsed.machines?.[target] || {};
+    const port = machine.base_port ? machine.base_port + (parsed.servers[serverName].port_offset || 0) : null;
+    res.json({ success: true, serverName, target, port });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/health — TCP port check on remote servers
 app.get('/api/health', async (req, res) => {
   try {
