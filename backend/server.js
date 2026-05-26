@@ -1,4 +1,5 @@
 import express from 'express';
+import yaml from 'js-yaml';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -382,6 +383,56 @@ app.put('/api/file', async (req, res) => {
     res.json({ success: true, path: filePath });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+const SERVERS_YAML_PATH = 'settings/servers.yaml';
+
+// GET /api/servers-registry?branch= — Get server placement metadata from servers.yaml
+app.get('/api/servers-registry', async (req, res) => {
+  try {
+    const branch = req.query.branch || LOCAL_BRANCH;
+    const response = await githubFetch(`/contents/${SERVERS_YAML_PATH}?ref=${branch}`);
+    if (!response.ok) return res.json({});
+    const file = await response.json();
+    const content = Buffer.from(file.content, 'base64').toString('utf-8');
+    const parsed = yaml.load(content);
+    const machines = parsed.machines || {};
+    const servers = parsed.servers || {};
+    const registry = {};
+    for (const [name, cfg] of Object.entries(servers)) {
+      const machine = machines[cfg.target] || {};
+      registry[name] = {
+        target: cfg.target,
+        host: machine.host || 'localhost',
+        port: machine.base_port ? machine.base_port + (cfg.port_offset || 0) : null
+      };
+    }
+    res.json(registry);
+  } catch (e) {
+    res.json({});
+  }
+});
+
+// GET /api/health — TCP port check on remote servers
+app.get('/api/health', async (req, res) => {
+  try {
+    const branch = req.query.branch || LOCAL_BRANCH;
+    const regRes = await fetch(`http://localhost:${PORT}/api/servers-registry?branch=${branch}`);
+    const registry = await regRes.json();
+    const { createConnection } = await import('net');
+    const checks = Object.entries(registry)
+      .filter(([, r]) => r.target !== 'envy' && r.port)
+      .map(([name, r]) => new Promise(resolve => {
+        const sock = createConnection({ host: r.host, port: r.port, timeout: 1500 });
+        sock.on('connect', () => { sock.destroy(); resolve([name, 'up']); });
+        sock.on('error', () => resolve([name, 'down']));
+        sock.on('timeout', () => { sock.destroy(); resolve([name, 'down']); });
+      }));
+    const results = await Promise.all(checks);
+    res.json(Object.fromEntries(results));
+  } catch (e) {
+    res.json({});
   }
 });
 

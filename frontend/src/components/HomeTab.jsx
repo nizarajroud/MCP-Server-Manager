@@ -4,7 +4,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { api } from '../lib/api';
 import MoveServerModal from './MoveServerModal';
 
-const HomeTab = ({ servers, categories, setCategories, agentContent, selectedAgent, selectedBranch, agents, saveToGitHub, setServers, showNotification, reloadAgent }) => {
+const HomeTab = ({ servers, categories, setCategories, registry, health, agentContent, selectedAgent, selectedBranch, agents, saveToGitHub, setServers, showNotification, reloadAgent }) => {
   const [selectedServers, setSelectedServers] = useState(new Set());
   const [collapsedCategories, setCollapsedCategories] = useState(new Set([...Object.keys(categories), '📦 Non catégorisé']));
   const [isEditing, setIsEditing] = useState(false);
@@ -165,6 +165,14 @@ const HomeTab = ({ servers, categories, setCategories, agentContent, selectedAge
                                     {selectedServers.has(server.name) ? <CheckSquare size={18} className="text-purple-400" /> : <Square size={18} className="text-slate-500" />}
                                   </button>
                                   <h3 className="text-sm">{server.name}</h3>
+                                  {registry[server.name] && (
+                                    <span className={`text-xs px-1.5 py-0.5 rounded ${registry[server.name].target === 'envy' ? 'bg-slate-600 text-slate-300' : registry[server.name].target === 'csben' ? 'bg-blue-900/50 text-blue-300' : 'bg-purple-900/50 text-purple-300'}`}>
+                                      {registry[server.name].target === 'envy' ? '🏠' : registry[server.name].target === 'csben' ? '🖥️' : '💻'} {registry[server.name].target}
+                                    </span>
+                                  )}
+                                  {health[server.name] && (
+                                    <span className={`w-2 h-2 rounded-full ${health[server.name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} title={health[server.name]} />
+                                  )}
                                 </div>
                                 <button onClick={() => toggleServerStatus(server.name)} className={`transition ml-2 ${server.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
                                   {server.disabled ? <PowerOff size={16} /> : <Power size={16} />}
