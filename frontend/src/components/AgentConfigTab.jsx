@@ -216,11 +216,12 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               <thead>
                 <tr className="border-b border-slate-700 text-slate-500 text-xs uppercase">
                   <th className="text-left py-1 px-3" rowSpan="2"></th>
-                  <th className="text-center py-1 px-3 border-l border-slate-700" colSpan="1">Client</th>
+                  <th className="text-center py-1 px-3 border-l border-slate-700" colSpan="2">Client</th>
                   <th className="text-center py-1 px-3 border-l border-slate-700" colSpan="3">Serveur</th>
                 </tr>
                 <tr className="border-b border-slate-600 text-slate-400">
-                  <th className="text-left py-2 px-3 border-l border-slate-700">Accès</th>
+                  <th className="text-left py-2 px-3 border-l border-slate-700">État</th>
+                  <th className="text-left py-2 px-3">Accès</th>
                   <th className="text-left py-2 px-3 border-l border-slate-700">Ressource</th>
                   <th className="text-left py-2 px-3">Port</th>
                   <th className="text-left py-2 px-3">Santé</th>
@@ -237,6 +238,18 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                     <tr key={name} className={`border-b border-slate-700/50 hover:bg-slate-700/30 ${!clientAligned ? 'bg-yellow-900/10' : ''}`}>
                       <td className="py-2 px-3 font-medium">{name}</td>
                       <td className="py-2 px-3 border-l border-slate-700">
+                        <button onClick={async () => {
+                          const mcpServers = { ...agentContent.mcpServers };
+                          mcpServers[name] = { ...mcpServers[name], disabled: !mcpServers[name].disabled };
+                          const action = mcpServers[name].disabled ? 'disable' : 'enable';
+                          await api.saveAgent(selectedAgent, { content: { ...agentContent, mcpServers }, branch: selectedBranch, message: `feat: ${action} ${name}` });
+                          showNotification(`${name} ${action}d ✓`);
+                          reloadAgent();
+                        }} className={`transition ${cfg.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
+                          {cfg.disabled ? '🔴' : '🟢'}
+                        </button>
+                      </td>
+                      <td className="py-2 px-3">
                         <span className={`text-xs px-1.5 py-0.5 rounded ${isRemote ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-600 text-slate-300'}`}>
                           {isRemote ? '🌐 mcp-remote' : '📦 direct'}
                         </span>
