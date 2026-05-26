@@ -183,6 +183,7 @@ const pullLocalRepo = async (branch) => {
   const { promisify } = await import('util');
   const execAsync = promisify(exec);
   try {
+    await execAsync(`git -C ${LOCAL_REPO_PATH} checkout -- . 2>/dev/null || true`);
     await execAsync(`git -C ${LOCAL_REPO_PATH} checkout ${branch} 2>/dev/null || true`);
     await execAsync(`git -C ${LOCAL_REPO_PATH} pull --rebase origin ${branch}`);
   } catch (e) {
