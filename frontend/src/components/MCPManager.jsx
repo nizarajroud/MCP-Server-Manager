@@ -22,11 +22,19 @@ const MCPManager = () => {
   const [categories, setCategories] = useState({});
   const [mainTab, setMainTab] = useState('home');
   const [version, setVersion] = useState('');
+  const [registry, setRegistry] = useState({});
+  const [health, setHealth] = useState({});
 
   useEffect(() => { loadConfig(); }, []);
   useEffect(() => { if (localBranch) loadBranches(); }, [localBranch]);
-  useEffect(() => { if (selectedBranch) { loadAgents(); loadCategories(); } }, [selectedBranch, defaultAgent]);
+  useEffect(() => { if (selectedBranch) { loadAgents(); loadCategories(); loadRegistry(); } }, [selectedBranch, defaultAgent]);
   useEffect(() => { if (selectedAgent) loadAgent(); }, [selectedAgent]);
+  useEffect(() => {
+    if (!selectedBranch) return;
+    loadHealth();
+    const interval = setInterval(loadHealth, 30000);
+    return () => clearInterval(interval);
+  }, [selectedBranch]);
 
   const isLocalBranch = selectedBranch === localBranch;
 
@@ -49,6 +57,14 @@ const MCPManager = () => {
       const cats = await api.getCategories(selectedBranch);
       setCategories(cats);
     } catch (e) {}
+  };
+
+  const loadRegistry = async () => {
+    try { setRegistry(await api.getServersRegistry(selectedBranch)); } catch (e) {}
+  };
+
+  const loadHealth = async () => {
+    try { setHealth(await api.getHealth(selectedBranch)); } catch (e) {}
   };
 
   const loadBranches = async () => {
@@ -194,6 +210,8 @@ const MCPManager = () => {
               servers={servers}
               categories={categories}
               setCategories={setCategories}
+              registry={registry}
+              health={health}
               agentContent={agentContent}
               selectedAgent={selectedAgent}
               selectedBranch={selectedBranch}

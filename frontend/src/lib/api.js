@@ -94,5 +94,15 @@ export const api = {
       throw new Error(err.error || 'Create failed');
     }
     return res.json();
+  },
+
+  async getServersRegistry(branch) {
+    const res = await fetch(`${API_URL}/api/servers-registry${branch ? `?branch=${branch}` : ''}`);
+    return res.json();
+  },
+
+  async getHealth(branch) {
+    const res = await fetch(`${API_URL}/api/health${branch ? `?branch=${branch}` : ''}`);
+    return res.json();
   }
 };
