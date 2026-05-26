@@ -246,7 +246,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'acces', asc: s.key === 'acces' ? !s.asc : true }))}>Accès {deploySort.key === 'acces' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3 border-l border-slate-700 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3">Port</th>
-                  <th className="text-left py-2 px-3">Santé <button onClick={reloadHealth} className="text-slate-500 hover:text-white ml-1" title="Rafraîchir">🔄</button></th>
+                  <th className="text-left py-2 px-3">Santé <button onClick={reloadHealth} className="text-slate-500 hover:text-white ml-1 active:scale-75 transition-transform" title="Rafraîchir">🔄</button></th>
                 </tr>
               </thead>
               <tbody>
@@ -281,7 +281,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                           try {
                             await saveToGitHub(mcpServers, `feat: ${action} ${name}`);
                           } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
-                        }} className={`transition ${cfg.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
+                        }} className={`transition active:scale-75 ${cfg.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
                           {cfg.disabled ? '🔴' : '🟢'}
                         </button>
                       </td>
