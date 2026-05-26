@@ -243,8 +243,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                           mcpServers[name] = { ...mcpServers[name], disabled: !mcpServers[name].disabled };
                           const action = mcpServers[name].disabled ? 'disable' : 'enable';
                           try {
-                            await api.saveAgent(selectedAgent, { content: { ...agentContent, mcpServers }, branch: selectedBranch, message: `feat: ${action} ${name}` });
-                            showNotification(`${name} ${action}d ✓`);
+                            await saveToGitHub(mcpServers, `feat: ${action} ${name}`);
                           } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
                         }} className={`transition ${cfg.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
                           {cfg.disabled ? '🔴' : '🟢'}
