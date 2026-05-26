@@ -34,7 +34,7 @@ fi
 source "$ENV_FILE"
 
 SSH_CMD="ssh -p ${SSH_PORT} -i ${SSH_KEY} -o StrictHostKeyChecking=no ${SSH_USER}@${MACHINE_HOST}"
-REMOTE_SCRIPTS_DIR="/home/${SSH_USER}/HomeWspce/MCP-Server-Manager/scripts/remote"
+REMOTE_SCRIPTS_DIR="${REMOTE_PROJECT_DIR}/scripts/remote"
 
 case "$ACTION" in
     start)

@@ -20,7 +20,7 @@ fi
 
 source "$ENV_FILE"
 
-SERVERS_YAML="${HOME}/HomeWspce/kiro-configs/settings/servers.yaml"
+SERVERS_YAML="${REMOTE_KIRO_CONFIGS:-${HOME}/HomeWspce/kiro-configs}/settings/servers.yaml"
 
 if [ ! -f "$SERVERS_YAML" ]; then
     echo "❌ servers.yaml not found at $SERVERS_YAML"
@@ -48,7 +48,7 @@ pkill -f supergateway 2>/dev/null || true
 sleep 1
 
 # Read agent configs to get the actual command for each server
-KIRO_CONFIGS="${HOME}/HomeWspce/kiro-configs"
+KIRO_CONFIGS="${REMOTE_KIRO_CONFIGS:-${HOME}/HomeWspce/kiro-configs}"
 AGENT_FILES=$(find "${KIRO_CONFIGS}/agents" -name "*.json" 2>/dev/null)
 MCP_JSON="${KIRO_CONFIGS}/settings/mcp.json"
 
