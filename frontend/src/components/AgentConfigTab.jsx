@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Upload, RotateCcw } from 'lucide-react';
+import { Save } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { json } from '@codemirror/lang-json';
@@ -297,8 +297,30 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                           <select value={reg?.target === 'envy' || !reg ? 'local' : reg.target} onChange={async (e) => {
                             try {
                               const target = e.target.value === 'local' ? 'envy' : e.target.value;
-                              await api.updateServerTarget(name, target, selectedBranch);
-                              showNotification(`${name} → ${e.target.value} ✓`);
+                              // 1. Update servers.yaml
+                              const result = await api.updateServerTarget(name, target, selectedBranch);
+                              // 2. Update agent JSON (client config)
+                              const mcpServers = { ...agentContent.mcpServers };
+                              const serverCfg = mcpServers[name];
+                              if (target === 'envy') {
+                                // Restore local: use _original if available
+                                if (serverCfg._original) {
+                                  mcpServers[name] = { ...serverCfg, command: serverCfg._original.command, args: serverCfg._original.args };
+                                  delete mcpServers[name]._original;
+                                }
+                              } else {
+                                // Switch to remote: store original + set mcp-remote
+                                const port = result.port;
+                                if (port && !(serverCfg.args && serverCfg.args.includes('mcp-remote'))) {
+                                  mcpServers[name] = {
+                                    ...serverCfg,
+                                    _original: { command: serverCfg.command, args: serverCfg.args },
+                                    command: 'npx',
+                                    args: ['mcp-remote', `http://192.168.2.56:${port}/mcp`, '--allow-http']
+                                  };
+                                }
+                              }
+                              await saveToGitHub(mcpServers, `feat: ${target === 'envy' ? 'restore local' : 'switch to remote'} ${name}`);
                               reloadRegistry();
                             } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
                           }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">
@@ -318,26 +340,6 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 })}
               </tbody>
             </table>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button onClick={async () => {
-              try {
-                const result = await api.applyRemoteConfig(selectedAgent, selectedBranch);
-                showNotification(`Config remote appliquée (${result.changed} serveurs) ✓`);
-                reloadAgent();
-              } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
-            }} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition flex items-center gap-2">
-              <Upload size={18} /> Aligner client → serveur
-            </button>
-            <button onClick={async () => {
-              try {
-                const result = await api.restoreLocalConfig(selectedAgent, selectedBranch);
-                showNotification(`Config locale restaurée (${result.changed} serveurs) ✓`);
-                reloadAgent();
-              } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
-            }} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition flex items-center gap-2">
-              <RotateCcw size={18} /> Restaurer config locale
-            </button>
           </div>
         </div>
         );
