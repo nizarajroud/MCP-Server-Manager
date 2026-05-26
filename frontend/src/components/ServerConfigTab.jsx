@@ -6,7 +6,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selectedBranch, showNotification, api }) => {
+const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selectedBranch, registry, health, showNotification, api }) => {
   const [selectedServer, setSelectedServer] = useState('');
   const [subTab, setSubTab] = useState('server');
   const [serverJson, setServerJson] = useState('');
@@ -89,7 +89,8 @@ const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selec
   const subTabs = [
     { id: 'server', label: 'Serveur' },
     { id: 'wrapper', label: 'Wrapper' },
-    { id: 'env', label: 'Variables d\'env' }
+    { id: 'env', label: 'Variables d\'env' },
+    { id: 'deploy', label: 'Déploiement' }
   ];
 
   return (
@@ -187,6 +188,40 @@ const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selec
               </button>
             </div>
           )}
+
+          {subTab === 'deploy' && selectedServer && (() => {
+            const reg = registry[selectedServer];
+            const cfg = agentContent.mcpServers[selectedServer];
+            const isRemote = cfg?.args?.includes('mcp-remote');
+            return (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-600">
+                    <p className="text-sm text-slate-400 mb-1">Machine cible</p>
+                    <p className="text-lg">{reg ? (reg.target === 'envy' ? '🏠 Local (envy)' : `💻 ${reg.target}`) : '❓ Non assigné'}</p>
+                  </div>
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-600">
+                    <p className="text-sm text-slate-400 mb-1">Port</p>
+                    <p className="text-lg">{reg?.port || '—'}</p>
+                  </div>
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-600">
+                    <p className="text-sm text-slate-400 mb-1">Santé</p>
+                    <p className="text-lg">{health[selectedServer] === 'up' ? '🟢 UP' : health[selectedServer] === 'down' ? '🔴 DOWN' : '— N/A'}</p>
+                  </div>
+                  <div className="bg-slate-900 p-4 rounded-lg border border-slate-600">
+                    <p className="text-sm text-slate-400 mb-1">Mode actuel</p>
+                    <p className="text-lg">{isRemote ? '🌐 Remote (mcp-remote)' : '📦 Local (direct)'}</p>
+                  </div>
+                </div>
+                {isRemote && cfg.args && (
+                  <div className="bg-slate-900 p-3 rounded-lg border border-slate-600">
+                    <p className="text-sm text-slate-400 mb-1">URL remote</p>
+                    <code className="text-purple-300">{cfg.args[1]}</code>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </>
       )}
     </div>

@@ -183,6 +183,7 @@ const pullLocalRepo = async (branch) => {
   const { promisify } = await import('util');
   const execAsync = promisify(exec);
   try {
+    await execAsync(`git -C ${LOCAL_REPO_PATH} checkout -- . 2>/dev/null || true`);
     await execAsync(`git -C ${LOCAL_REPO_PATH} checkout ${branch} 2>/dev/null || true`);
     await execAsync(`git -C ${LOCAL_REPO_PATH} pull --rebase origin ${branch}`);
   } catch (e) {
@@ -433,6 +434,130 @@ app.get('/api/health', async (req, res) => {
     res.json(Object.fromEntries(results));
   } catch (e) {
     res.json({});
+  }
+});
+
+// POST /api/apply-remote-config — Transform agent JSON: remote servers → mcp-remote
+app.post('/api/apply-remote-config', async (req, res) => {
+  try {
+    const { agent, branch } = req.body;
+    if (!agent || !branch) return res.status(400).json({ error: 'agent and branch required' });
+
+    // Load registry from servers.yaml
+    const regRes = await githubFetch(`/contents/${SERVERS_YAML_PATH}?ref=${branch}`);
+    if (!regRes.ok) return res.status(404).json({ error: 'servers.yaml not found' });
+    const regFile = await regRes.json();
+    const parsed = yaml.load(Buffer.from(regFile.content, 'base64').toString('utf-8'));
+    const machines = parsed.machines || {};
+    const serversYaml = parsed.servers || {};
+
+    // Load agent JSON
+    const filePath = agent === 'Commun' ? LEGACY_MCP_PATH : `agents/${agent}.json`;
+    const agentRes = await githubFetch(`/contents/${filePath}?ref=${branch}`);
+    if (!agentRes.ok) return res.status(404).json({ error: 'Agent not found' });
+    const agentFile = await agentRes.json();
+    const agentContent = JSON.parse(Buffer.from(agentFile.content, 'base64').toString('utf-8'));
+
+    // Transform: for each server with remote target, replace with mcp-remote
+    const mcpServers = agentContent.mcpServers || {};
+    let changed = 0;
+    for (const [name, config] of Object.entries(mcpServers)) {
+      const srv = serversYaml[name];
+      if (!srv || srv.target === 'envy') continue;
+      const machine = machines[srv.target];
+      if (!machine || !machine.base_port) continue;
+      const port = machine.base_port + (srv.port_offset || 0);
+      const url = `http://${machine.host}:${port}/sse`;
+      // Only transform if not already mcp-remote
+      if (config.args && config.args.includes('mcp-remote')) continue;
+      // Store original config for restore
+      mcpServers[name] = {
+        ...config,
+        _original: { command: config.command, args: config.args },
+        command: 'npx',
+        args: ['mcp-remote', url, '--allow-http']
+      };
+      changed++;
+    }
+
+    if (changed === 0) return res.json({ success: true, changed: 0, message: 'Nothing to change' });
+
+    // Commit
+    const updated = { ...agentContent, mcpServers };
+    const latestRes = await githubFetch(`/contents/${filePath}?ref=${branch}`);
+    const latest = await latestRes.json();
+    const encoded = Buffer.from(JSON.stringify(updated, null, 2)).toString('base64');
+    const commitRes = await githubFetch(`/contents/${filePath}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        message: `feat: apply remote config on ${agent} (${changed} servers)`,
+        content: encoded,
+        sha: latest.sha,
+        branch
+      })
+    });
+    if (!commitRes.ok) {
+      const err = await commitRes.json();
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (agent !== 'Commun') await syncFileToLocal(filePath, branch);
+    await pullLocalRepo(branch);
+
+    res.json({ success: true, changed });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/restore-local-config — Restore original commands from _original field
+app.post('/api/restore-local-config', async (req, res) => {
+  try {
+    const { agent, branch } = req.body;
+    if (!agent || !branch) return res.status(400).json({ error: 'agent and branch required' });
+
+    const filePath = agent === 'Commun' ? LEGACY_MCP_PATH : `agents/${agent}.json`;
+    const agentRes = await githubFetch(`/contents/${filePath}?ref=${branch}`);
+    if (!agentRes.ok) return res.status(404).json({ error: 'Agent not found' });
+    const agentFile = await agentRes.json();
+    const agentContent = JSON.parse(Buffer.from(agentFile.content, 'base64').toString('utf-8'));
+
+    const mcpServers = agentContent.mcpServers || {};
+    let changed = 0;
+    for (const [name, config] of Object.entries(mcpServers)) {
+      if (config._original) {
+        mcpServers[name] = { ...config, command: config._original.command, args: config._original.args };
+        delete mcpServers[name]._original;
+        changed++;
+      }
+    }
+
+    if (changed === 0) return res.json({ success: true, changed: 0, message: 'Nothing to restore' });
+
+    const updated = { ...agentContent, mcpServers };
+    const latestRes = await githubFetch(`/contents/${filePath}?ref=${branch}`);
+    const latest = await latestRes.json();
+    const encoded = Buffer.from(JSON.stringify(updated, null, 2)).toString('base64');
+    const commitRes = await githubFetch(`/contents/${filePath}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        message: `feat: restore local config on ${agent} (${changed} servers)`,
+        content: encoded,
+        sha: latest.sha,
+        branch
+      })
+    });
+    if (!commitRes.ok) {
+      const err = await commitRes.json();
+      return res.status(500).json({ error: err.message });
+    }
+
+    if (agent !== 'Commun') await syncFileToLocal(filePath, branch);
+    await pullLocalRepo(branch);
+
+    res.json({ success: true, changed });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 

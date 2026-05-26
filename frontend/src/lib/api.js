@@ -104,5 +104,25 @@ export const api = {
   async getHealth(branch) {
     const res = await fetch(`${API_URL}/api/health${branch ? `?branch=${branch}` : ''}`);
     return res.json();
+  },
+
+  async applyRemoteConfig(agent, branch) {
+    const res = await fetch(`${API_URL}/api/apply-remote-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent, branch })
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
+    return res.json();
+  },
+
+  async restoreLocalConfig(agent, branch) {
+    const res = await fetch(`${API_URL}/api/restore-local-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agent, branch })
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
+    return res.json();
   }
 };
