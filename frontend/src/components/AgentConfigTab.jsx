@@ -262,7 +262,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 reloadAgent();
               } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
             }} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition flex items-center gap-2">
-              <Upload size={18} /> Appliquer mode distribué
+              <Upload size={18} /> Appliquer config remote
             </button>
             <button onClick={async () => {
               try {
@@ -271,7 +271,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 reloadAgent();
               } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
             }} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition flex items-center gap-2">
-              <RotateCcw size={18} /> Restaurer mode local
+              <RotateCcw size={18} /> Restaurer config locale
             </button>
           </div>
         </div>
