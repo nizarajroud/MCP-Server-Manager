@@ -453,7 +453,7 @@ app.post('/api/apply-remote-config', async (req, res) => {
       const machine = machines[srv.target];
       if (!machine || !machine.base_port) continue;
       const port = machine.base_port + (srv.port_offset || 0);
-      const url = `http://${machine.host}:${port}/sse`;
+      const url = `http://${machine.host}:${port}/mcp`;
       // Only transform if not already mcp-remote
       if (config.args && config.args.includes('mcp-remote')) continue;
       // Store original config for restore
