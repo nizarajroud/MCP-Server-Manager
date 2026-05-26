@@ -231,8 +231,8 @@ app.put('/api/agent/:name', async (req, res) => {
 
     const result = await response.json();
 
-    // 3. SYNC LOCAL: Download updated file to ~/.kiro/agents/
-    const localPath = await syncFileToLocal(filePath, branch);
+    // 3. SYNC LOCAL: Download updated file to ~/.kiro/agents/ (skip Commun — git pull handles it)
+    const localPath = req.params.name !== 'Commun' ? await syncFileToLocal(filePath, branch) : null;
 
     // 4. GIT PULL: Sync local repo with remote
     await pullLocalRepo(branch);
