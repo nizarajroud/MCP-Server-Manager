@@ -1,11 +1,24 @@
 #!/usr/bin/env bash
 # MCP Remote Deployment — Start all supergateway instances
 # Run this ON the remote WSL machine (or via SSH from deploy.sh).
-# Reads servers.yaml from kiro-configs to know which servers to launch.
+# Usage: ./start-servers.sh <machine-name>
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/machine.env"
+MACHINE="${1:-}"
+
+if [ -z "$MACHINE" ]; then
+    echo "Usage: $0 <machine-name>"
+    exit 1
+fi
+
+ENV_FILE="${SCRIPT_DIR}/machine-${MACHINE}.env"
+if [ ! -f "$ENV_FILE" ]; then
+    echo "❌ Config not found: $ENV_FILE"
+    exit 1
+fi
+
+source "$ENV_FILE"
 
 SERVERS_YAML="${HOME}/HomeWspce/kiro-configs/settings/servers.yaml"
 
