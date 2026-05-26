@@ -216,10 +216,10 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               <thead>
                 <tr className="border-b border-slate-600 text-slate-400">
                   <th className="text-left py-2 px-3">Serveur</th>
-                  <th className="text-left py-2 px-3">Cible</th>
+                  <th className="text-left py-2 px-3">État actuel</th>
+                  <th className="text-left py-2 px-3">État souhaité</th>
                   <th className="text-left py-2 px-3">Port</th>
                   <th className="text-left py-2 px-3">Santé</th>
-                  <th className="text-left py-2 px-3">Mode actuel</th>
                 </tr>
               </thead>
               <tbody>
@@ -230,6 +230,11 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   return (
                     <tr key={name} className="border-b border-slate-700/50 hover:bg-slate-700/30">
                       <td className="py-2 px-3">{name}</td>
+                      <td className="py-2 px-3">
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${isRemote ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-600 text-slate-300'}`}>
+                          {isRemote ? '🌐 mcp-remote' : '📦 direct'}
+                        </span>
+                      </td>
                       <td className="py-2 px-3">
                         {(() => {
                           const isInternet = cfg?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
@@ -243,11 +248,6 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                         {health[name] ? (
                           <span className={`w-2 h-2 inline-block rounded-full ${health[name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} />
                         ) : '—'}
-                      </td>
-                      <td className="py-2 px-3">
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${isRemote ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-600 text-slate-300'}`}>
-                          {isRemote ? '🌐 mcp-remote' : '📦 direct'}
-                        </span>
                       </td>
                     </tr>
                   );
