@@ -231,11 +231,12 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                     <tr key={name} className="border-b border-slate-700/50 hover:bg-slate-700/30">
                       <td className="py-2 px-3">{name}</td>
                       <td className="py-2 px-3">
-                        {reg ? (
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${reg.target === 'envy' ? 'bg-slate-600 text-slate-300' : 'bg-purple-900/50 text-purple-300'}`}>
-                            {reg.target === 'envy' ? '🏠 local' : `💻 ${reg.target}`}
-                          </span>
-                        ) : <span className="text-slate-500">—</span>}
+                        {(() => {
+                          const isInternet = cfg?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
+                          if (isInternet) return <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>;
+                          if (reg && reg.target !== 'envy') return <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">💻 {reg.target}</span>;
+                          return <span className="text-xs px-1.5 py-0.5 rounded bg-slate-600 text-slate-300">📦 Local</span>;
+                        })()}
                       </td>
                       <td className="py-2 px-3 text-slate-400">{reg?.port || '—'}</td>
                       <td className="py-2 px-3">
@@ -245,7 +246,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                       </td>
                       <td className="py-2 px-3">
                         <span className={`text-xs px-1.5 py-0.5 rounded ${isRemote ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-600 text-slate-300'}`}>
-                          {isRemote ? '🌐 remote' : '📦 local'}
+                          {isRemote ? '🌐 mcp-remote' : '📦 direct'}
                         </span>
                       </td>
                     </tr>
