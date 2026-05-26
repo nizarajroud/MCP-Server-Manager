@@ -236,6 +236,7 @@ const MCPManager = () => {
               showNotification={showNotification}
               reloadAgent={loadAgent}
               reloadRegistry={loadRegistry}
+              setRegistry={setRegistry}
               reloadHealth={loadHealth}
               api={api}
             />

@@ -7,7 +7,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, registry, health, saveToGitHub, showNotification, reloadAgent, reloadRegistry, reloadHealth, api }) => {
+const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, registry, health, saveToGitHub, showNotification, reloadAgent, reloadRegistry, setRegistry, reloadHealth, api }) => {
   const [subTab, setSubTab] = useState('general');
   const [deploySort, setDeploySort] = useState({ key: null, asc: true });
   const [deploySearch, setDeploySearch] = useState('');
@@ -254,6 +254,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   await api.updateServerTarget(n, 'pcalt', selectedBranch);
                 }
                 const regData = await api.getServersRegistry(selectedBranch);
+                setRegistry(regData);
                 const mcpServers = { ...agentContent.mcpServers };
                 for (const n of deploySelected) {
                   const r = regData[n];
@@ -267,7 +268,6 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   }
                 }
                 await saveToGitHub(mcpServers, `feat: move ${deploySelected.size} servers to pcalt`);
-                await reloadRegistry();
                 await reloadHealth();
                 setDeploySelected(new Set());
               }} className="px-3 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs active:scale-90 transition-transform">💻 → pcalt</button>
@@ -276,6 +276,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   await api.updateServerTarget(n, 'envy', selectedBranch);
                 }
                 const mcpServers = { ...agentContent.mcpServers };
+                const updatedRegistry = { ...registry };
                 for (const n of deploySelected) {
                   const cfg = mcpServers[n];
                   if (cfg._original) {
@@ -284,9 +285,10 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   } else {
                     mcpServers[n] = { ...cfg, disabled: false };
                   }
+                  updatedRegistry[n] = { target: 'envy', host: 'localhost', port: null };
                 }
+                setRegistry(updatedRegistry);
                 await saveToGitHub(mcpServers, `feat: move ${deploySelected.size} servers to local`);
-                await reloadRegistry();
                 await reloadHealth();
                 setDeploySelected(new Set());
               }} className="px-3 py-1 bg-slate-600 hover:bg-slate-500 rounded text-xs active:scale-90 transition-transform">📦 → Local</button>
