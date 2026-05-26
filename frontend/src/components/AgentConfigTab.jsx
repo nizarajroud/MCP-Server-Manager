@@ -299,21 +299,16 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700 text-slate-500 text-xs uppercase">
-                  <th className="py-1 px-2" rowSpan="2">
+                <tr className="border-b border-slate-600 text-slate-400">
+                  <th className="py-2 px-2">
                     <input type="checkbox" onChange={(e) => {
                       const all = Object.keys(agentContent.mcpServers || {});
                       setDeploySelected(e.target.checked ? new Set(all) : new Set());
                     }} checked={deploySelected.size > 0 && deploySelected.size === Object.keys(agentContent.mcpServers || {}).length} className="accent-purple-500" />
                   </th>
-                  <th className="text-left py-1 px-3" rowSpan="2"></th>
-                  <th className="text-center py-1 px-3 border-l border-slate-700" colSpan="2">Client</th>
-                  <th className="text-center py-1 px-3 border-l border-slate-700" colSpan="3">Serveur</th>
-                </tr>
-                <tr className="border-b border-slate-600 text-slate-400">
-                  <th className="text-left py-2 px-3 border-l border-slate-700 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
-                  <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'acces', asc: s.key === 'acces' ? !s.asc : true }))}>Accès {deploySort.key === 'acces' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
-                  <th className="text-left py-2 px-3 border-l border-slate-700 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
+                  <th className="text-left py-2 px-3">Serveur</th>
+                  <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
+                  <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3">Port</th>
                   <th className="text-left py-2 px-3">Santé <button onClick={reloadHealth} className="text-slate-500 hover:text-white ml-1 active:scale-75 transition-transform" title="Rafraîchir">🔄</button></th>
                 </tr>
@@ -322,25 +317,22 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 {Object.keys(agentContent.mcpServers || {}).filter(name => !deploySearch || name.toLowerCase().includes(deploySearch.toLowerCase())).map(name => {
                   const reg = registry[name];
                   const cfg = agentContent.mcpServers[name];
-                  const isRemote = cfg.args && cfg.args.includes('mcp-remote');
                   const isInternet = cfg?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
-                  return { name, reg, cfg, isRemote, isInternet, disabled: !!cfg.disabled, ressource: isInternet ? 'internet' : (reg && reg.target !== 'envy') ? reg.target : '' };
+                  return { name, reg, cfg, isInternet, disabled: !!cfg.disabled, ressource: isInternet ? 'internet' : (reg && reg.target !== 'envy') ? reg.target : '' };
                 }).sort((a, b) => {
                   if (!deploySort.key) return 0;
                   let va, vb;
                   switch (deploySort.key) {
                     case 'etat': va = a.disabled ? 1 : 0; vb = b.disabled ? 1 : 0; break;
-                    case 'acces': va = a.isRemote ? 1 : 0; vb = b.isRemote ? 1 : 0; break;
                     case 'ressource': va = a.ressource; vb = b.ressource; break;
                     default: return 0;
                   }
                   if (va < vb) return deploySort.asc ? -1 : 1;
                   if (va > vb) return deploySort.asc ? 1 : -1;
                   return 0;
-                }).map(({ name, reg, cfg, isRemote, isInternet }) => {
-                  const clientAligned = (isInternet) || (isRemote && reg && reg.target !== 'envy') || (!isRemote && (!reg || reg.target === 'envy'));
+                }).map(({ name, reg, cfg, isInternet }) => {
                   return (
-                    <tr key={name} className={`border-b border-slate-700/50 hover:bg-slate-700/30 ${!clientAligned ? 'bg-yellow-900/10' : ''}`}>
+                    <tr key={name} className="border-b border-slate-700/50 hover:bg-slate-700/30">
                       <td className="py-2 px-2">
                         <input type="checkbox" checked={deploySelected.has(name)} onChange={() => {
                           const s = new Set(deploySelected);
@@ -362,11 +354,6 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                         </button>
                       </td>
                       <td className="py-2 px-3">
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${isRemote ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-600 text-slate-300'}`}>
-                          {isRemote ? '🌐 mcp-remote' : '📦 direct'}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 border-l border-slate-700">
                         {isInternet ? (
                           <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>
                         ) : (
