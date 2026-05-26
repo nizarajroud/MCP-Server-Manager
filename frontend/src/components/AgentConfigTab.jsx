@@ -299,7 +299,6 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                               const target = e.target.value === 'local' ? 'envy' : e.target.value;
                               await api.updateServerTarget(name, target, selectedBranch);
                               showNotification(`${name} → ${e.target.value} ✓`);
-                              reloadAgent();
                             } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
                           }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">
                             <option value="local">📦 Local</option>
