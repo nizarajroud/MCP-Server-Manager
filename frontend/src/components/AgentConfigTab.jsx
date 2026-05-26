@@ -294,14 +294,15 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                         {isInternet ? (
                           <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>
                         ) : (
-                          <select value={reg?.target || 'envy'} onChange={async (e) => {
+                          <select value={reg?.target === 'envy' || !reg ? 'local' : reg.target} onChange={async (e) => {
                             try {
-                              await api.updateServerTarget(name, e.target.value, selectedBranch);
+                              const target = e.target.value === 'local' ? 'envy' : e.target.value;
+                              await api.updateServerTarget(name, target, selectedBranch);
                               showNotification(`${name} → ${e.target.value} ✓`);
                               reloadAgent();
                             } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
                           }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">
-                            <option value="envy">📦 local</option>
+                            <option value="local">📦 Local</option>
                             <option value="pcalt">💻 pcalt</option>
                           </select>
                         )}
