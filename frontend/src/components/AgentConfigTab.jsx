@@ -305,8 +305,10 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                               if (target === 'envy') {
                                 // Restore local: use _original if available
                                 if (serverCfg._original) {
-                                  mcpServers[name] = { ...serverCfg, command: serverCfg._original.command, args: serverCfg._original.args };
+                                  mcpServers[name] = { ...serverCfg, command: serverCfg._original.command, args: serverCfg._original.args, disabled: false };
                                   delete mcpServers[name]._original;
+                                } else {
+                                  mcpServers[name] = { ...serverCfg, disabled: false };
                                 }
                               } else {
                                 // Switch to remote: store original + set mcp-remote
@@ -316,8 +318,11 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                                     ...serverCfg,
                                     _original: { command: serverCfg.command, args: serverCfg.args },
                                     command: 'npx',
-                                    args: ['mcp-remote', `http://192.168.2.56:${port}/mcp`, '--allow-http']
+                                    args: ['mcp-remote', `http://192.168.2.56:${port}/mcp`, '--allow-http'],
+                                    disabled: false
                                   };
+                                } else {
+                                  mcpServers[name] = { ...serverCfg, disabled: false };
                                 }
                               }
                               await saveToGitHub(mcpServers, `feat: ${target === 'envy' ? 'restore local' : 'switch to remote'} ${name}`);
