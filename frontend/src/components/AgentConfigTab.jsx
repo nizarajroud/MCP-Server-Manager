@@ -215,9 +215,9 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
 
       {subTab === 'deploy' && (() => {
         const allServers = Object.keys(agentContent.mcpServers || {});
-        const totalDirect = allServers.filter(n => { const c = agentContent.mcpServers[n]; return !(c.args && c.args.includes('mcp-remote')); }).length;
         const totalInternet = allServers.filter(n => { const c = agentContent.mcpServers[n]; return c.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); }).length;
-        const totalLAN = allServers.length - totalDirect - totalInternet;
+        const totalLAN = allServers.filter(n => { const c = agentContent.mcpServers[n]; return c.args?.includes('mcp-remote') && !c.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); }).length;
+        const totalDirect = allServers.length - totalInternet - totalLAN;
         const totalEnabled = allServers.filter(n => !agentContent.mcpServers[n].disabled).length;
         return (
         <div className="space-y-4">
