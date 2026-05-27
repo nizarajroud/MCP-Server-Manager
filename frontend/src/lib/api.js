@@ -111,6 +111,16 @@ export const api = {
     return res.json();
   },
 
+  async batchUpdateTargets(updates, branch) {
+    const res = await fetch(`${API_URL}/api/servers-registry/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates, branch })
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
+    return res.json();
+  },
+
   async getHealth(branch) {
     const res = await fetch(`${API_URL}/api/health${branch ? `?branch=${branch}` : ''}`);
     return res.json();
