@@ -257,18 +257,24 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               <button disabled={batchLoading} onClick={async () => {
                 setBatchLoading(true);
                 try {
-                  const updates = [...deploySelected].map(n => ({ serverName: n, target: 'pcalt' }));
+                  // Exclude Internet servers from batch
+                  const eligible = [...deploySelected].filter(n => {
+                    const c = agentContent.mcpServers[n];
+                    return !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
+                  });
+                  if (!eligible.length) { showNotification('Aucun serveur éligible (Internet exclus)', 'error'); setBatchLoading(false); return; }
+                  const updates = eligible.map(n => ({ serverName: n, target: 'pcalt' }));
                   const result = await api.batchUpdateTargets(updates, selectedBranch);
                   setRegistry(result.registry);
                   const mcpServers = { ...agentContent.mcpServers };
-                  for (const n of deploySelected) {
+                  for (const n of eligible) {
                     const r = result.registry[n];
                     if (r && r.port) {
                       const cfg = mcpServers[n];
                       mcpServers[n] = { ...cfg, _original: cfg._original || { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false };
                     }
                   }
-                  await saveToGitHub(mcpServers, `feat: move ${deploySelected.size} servers to pcalt`);
+                  await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to pcalt`);
                   await reloadHealth();
                   setDeploySelected(new Set());
                 } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
