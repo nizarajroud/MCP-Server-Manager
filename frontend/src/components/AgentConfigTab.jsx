@@ -318,7 +318,6 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   <th className="text-left py-2 px-3">Serveur</th>
                   <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
-                  <th className="text-left py-2 px-3">Port</th>
                   <th className="text-left py-2 px-3">Santé <button onClick={reloadHealth} className="text-slate-500 hover:text-white ml-1 active:scale-75 transition-transform" title="Rafraîchir">🔄</button></th>
                 </tr>
               </thead>
@@ -407,7 +406,6 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                           </select>
                         )}
                       </td>
-                      <td className="py-2 px-3 text-slate-400">{reg?.port || '—'}</td>
                       <td className="py-2 px-3">
                         {health[name] ? (
                           <span className={`w-2 h-2 inline-block rounded-full ${health[name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} />
