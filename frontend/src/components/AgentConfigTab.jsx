@@ -216,15 +216,17 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
       {subTab === 'deploy' && (() => {
         const allServers = Object.keys(agentContent.mcpServers || {});
         const totalDirect = allServers.filter(n => { const c = agentContent.mcpServers[n]; return !(c.args && c.args.includes('mcp-remote')); }).length;
-        const totalRemote = allServers.length - totalDirect;
+        const totalInternet = allServers.filter(n => { const c = agentContent.mcpServers[n]; return c.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); }).length;
+        const totalLAN = allServers.length - totalDirect - totalInternet;
         const totalEnabled = allServers.filter(n => !agentContent.mcpServers[n].disabled).length;
         return (
         <div className="space-y-4">
           <div className="flex gap-4 items-center flex-wrap">
             <div className="flex gap-3 text-sm">
               <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
-              <span className="px-2 py-1 bg-slate-700 rounded">📦 Direct: <strong>{totalDirect}</strong></span>
-              <span className="px-2 py-1 bg-blue-900/50 rounded text-blue-300">🌐 Remote: <strong>{totalRemote}</strong></span>
+              <span className="px-2 py-1 bg-slate-700 rounded">📦 Local: <strong>{totalDirect}</strong></span>
+              <span className="px-2 py-1 bg-purple-900/50 rounded text-purple-300">💻 LAN: <strong>{totalLAN}</strong></span>
+              <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">🌐 Internet: <strong>{totalInternet}</strong></span>
               <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">✓ Actifs: <strong>{totalEnabled}</strong></span>
             </div>
             <input
