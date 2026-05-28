@@ -266,6 +266,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 case 'priority': return (c.priority || 'standard') === 'critical' ? 0 : 1;
                 case 'etat': return c.disabled ? 1 : 0;
                 case 'ressource': return isInet ? 'internet' : (r && r.target !== 'envy') ? r.target : 'local';
+                case 'cl': return resources[n]?.memMB || 0;
                 default: return 0;
               }
             };
@@ -483,7 +484,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   <th className="text-left py-2 px-3 w-16 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'priority', asc: s.key === 'priority' ? !s.asc : true }))}>Priorité {deploySort.key === 'priority' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3 w-12 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3 w-28 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
-                  <th className="text-left py-2 px-3 w-12" title="Consommation Locale">CL</th>
+                  <th className="text-left py-2 px-3 w-12 cursor-pointer hover:text-white" title="Consommation Locale" onClick={() => setDeploySort(s => ({ key: 'cl', asc: s.key === 'cl' ? !s.asc : true }))}>CL {deploySort.key === 'cl' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3 w-12">Santé</th>
                 </tr>
               </thead>
