@@ -303,7 +303,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                       mcpServers[name] = { ...mcpServers[name], priority: next };
                       await saveToGitHub(mcpServers, `feat: set ${name} priority to ${next}`);
                     }} className="active:scale-75 transition-transform" title={priority}>
-                      {priority === 'critical' ? '🔴' : '🟡'}
+                      {priority === 'critical' ? '⭐' : '○'}
                     </button>
                   </td>
                   <td className="py-2 px-3 w-12">
