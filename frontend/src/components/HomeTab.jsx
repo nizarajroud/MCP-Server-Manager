@@ -170,7 +170,7 @@ const HomeTab = ({ servers, categories, setCategories, registry, health, agentCo
                                     const cfg = agentContent.mcpServers[server.name];
                                     const isRemoteInternet = cfg?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
                                     if (isRemoteInternet) return <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>;
-                                    if (reg && reg.target !== 'envy') return <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">💻 {reg.target}</span>;
+                                    if (reg && reg.target !== 'local') return <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">💻 {reg.target}</span>;
                                     if (reg) return <span className="text-xs px-1.5 py-0.5 rounded bg-slate-600 text-slate-300">📦 Local</span>;
                                     return null;
                                   })()}

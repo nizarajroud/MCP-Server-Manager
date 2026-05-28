@@ -265,7 +265,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               switch (deploySort.key) {
                 case 'priority': return (c.priority || 'standard') === 'critical' ? 0 : 1;
                 case 'etat': return c.disabled ? 1 : 0;
-                case 'ressource': return isInet ? 'internet' : (r && r.target !== 'envy') ? r.target : 'local';
+                case 'ressource': return isInet ? 'internet' : (r && r.target !== 'local') ? r.target : 'local';
                 case 'cl': return resources[n]?.memMB || 0;
                 default: return 0;
               }
@@ -347,20 +347,20 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                     {isInternet ? (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>
                     ) : (
-                      <select value={reg?.target === 'envy' || !reg ? 'local' : reg.target} onChange={async (e) => {
+                      <select value={reg?.target === 'local' || !reg ? 'local' : reg.target} onChange={async (e) => {
                         try {
-                          const target = e.target.value === 'local' ? 'envy' : e.target.value;
+                          const target = e.target.value;
                           const result = await api.updateServerTarget(name, target, selectedBranch);
                           const mcpServers = { ...agentContent.mcpServers };
                           const serverCfg = mcpServers[name];
-                          if (target === 'envy') {
+                          if (target === 'local') {
                             if (serverCfg._original) { mcpServers[name] = { ...serverCfg, command: serverCfg._original.command, args: serverCfg._original.args, disabled: false }; delete mcpServers[name]._original; }
                             else { mcpServers[name] = { ...serverCfg, disabled: false }; }
                           } else {
                             const port = result.port;
                             if (port) { mcpServers[name] = { ...serverCfg, _original: serverCfg._original || { command: serverCfg.command, args: serverCfg.args }, command: 'npx', args: ['mcp-remote', `http://192.168.2.56:${port}/mcp`, '--allow-http'], disabled: false }; }
                           }
-                          await saveToGitHub(mcpServers, `feat: ${target === 'envy' ? 'restore local' : 'switch to remote'} ${name}`);
+                          await saveToGitHub(mcpServers, `feat: ${target === 'local' ? 'restore local' : 'switch to remote'} ${name}`);
                           reloadRegistry(); reloadHealth();
                         } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
                       }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">
@@ -370,7 +370,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                     )}
                   </td>
                   <td className="py-2 px-3 w-12" title={resources[name] ? `CPU: ${resources[name].cpu}% | MEM: ${resources[name].memMB}MB` : ''}>
-                    {(!isInternet && (!reg || reg.target === 'envy')) ? (resources[name] ? (resources[name].weight === 'heavy' ? '🔥' : '🍃') : '—') : '—'}
+                    {(!isInternet && (!reg || reg.target === 'local')) ? (resources[name] ? (resources[name].weight === 'heavy' ? '🔥' : '🍃') : '—') : '—'}
                   </td>
                   <td className="py-2 px-3 w-12">
                     {health[name] ? <span className={`w-2 h-2 inline-block rounded-full ${health[name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} /> : '—'}
@@ -442,7 +442,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 try {
                   const eligible = [...deploySelected].filter(n => (agentContent.mcpServers[n]?.priority || 'standard') !== 'critical');
                   if (!eligible.length) { showNotification('Critiques exclus', 'error'); setBatchLoading(false); return; }
-                  const updates = eligible.map(n => ({ serverName: n, target: 'envy' }));
+                  const updates = eligible.map(n => ({ serverName: n, target: 'local' }));
                   const result = await api.batchUpdateTargets(updates, selectedBranch);
                   setRegistry(result.registry);
                   const mcpServers = { ...agentContent.mcpServers };
@@ -474,7 +474,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             const pcaltClientsActive = pcaltServers.filter(n => !agentContent.mcpServers[n].disabled).length;
             const pcaltServersUp = pcaltServers.filter(n => health[n] === 'up').length;
             const pcaltIdle = pcaltServersUp - pcaltClientsActive;
-            const localServers = allServers.filter(n => !registry[n] || registry[n].target === 'envy');
+            const localServers = allServers.filter(n => !registry[n] || registry[n].target === 'local');
             const localActive = localServers.filter(n => !agentContent.mcpServers[n].disabled).length;
             const localMemMB = localServers.reduce((sum, n) => sum + (resources[n]?.memMB || 0), 0);
             return (
