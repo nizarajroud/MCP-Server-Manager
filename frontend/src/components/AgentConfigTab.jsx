@@ -469,6 +469,30 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               {batchLoading && <span className="text-xs text-purple-300 animate-pulse">⏳ En cours...</span>}
             </div>
           )}
+          {(() => {
+            const pcaltServers = allServers.filter(n => registry[n]?.target === 'pcalt' || (agentContent.mcpServers[n]?.args?.includes('mcp-remote') && !agentContent.mcpServers[n]?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')))));
+            const pcaltClientsActive = pcaltServers.filter(n => !agentContent.mcpServers[n].disabled).length;
+            const pcaltServersUp = pcaltServers.filter(n => health[n] === 'up').length;
+            const pcaltIdle = pcaltServersUp - pcaltClientsActive;
+            const localServers = allServers.filter(n => !registry[n] || registry[n].target === 'envy');
+            const localActive = localServers.filter(n => !agentContent.mcpServers[n].disabled).length;
+            const localMemMB = localServers.reduce((sum, n) => sum + (resources[n]?.memMB || 0), 0);
+            return (
+              <div className="flex gap-4 text-xs flex-wrap mb-3">
+                <div className="px-3 py-2 bg-purple-900/20 border border-purple-800/50 rounded-lg flex gap-3 items-center">
+                  <span className="font-semibold text-purple-300">💻 pcalt</span>
+                  <span>Clients actifs: <strong>{pcaltClientsActive}/{pcaltServers.length}</strong></span>
+                  <span>Serveurs UP: <strong>{pcaltServersUp}/{pcaltServers.length}</strong></span>
+                  {pcaltIdle > 0 && <span className="text-yellow-400">⚠️ {pcaltIdle} sans client</span>}
+                </div>
+                <div className="px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg flex gap-3 items-center">
+                  <span className="font-semibold text-slate-300">📦 Local</span>
+                  <span>Actifs: <strong>{localActive}/{localServers.length}</strong></span>
+                  <span>Conso: <strong>{localMemMB > 1024 ? `${(localMemMB/1024).toFixed(1)} GB` : `${localMemMB} MB`}</strong></span>
+                </div>
+              </div>
+            );
+          })()}
           <DragDropContext onDragEnd={onDragEnd}>
             <table className="w-full text-sm">
               <thead>
