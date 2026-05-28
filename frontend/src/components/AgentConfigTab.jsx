@@ -219,11 +219,13 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
         const totalLAN = allServers.filter(n => { const c = agentContent.mcpServers[n]; return c.args?.includes('mcp-remote') && !c.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); }).length;
         const totalDirect = allServers.length - totalInternet - totalLAN;
         const totalEnabled = allServers.filter(n => !agentContent.mcpServers[n].disabled).length;
+        const totalCritical = allServers.filter(n => (agentContent.mcpServers[n].priority || 'standard') === 'critical').length;
         return (
         <div className="space-y-4">
           <div className="flex gap-4 items-center flex-wrap">
-            <div className="flex gap-3 text-sm">
+            <div className="flex gap-3 text-sm flex-wrap">
               <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
+              <span className="px-2 py-1 bg-red-900/50 rounded text-red-300">🔴 Critiques: <strong>{totalCritical}</strong></span>
               <span className="px-2 py-1 bg-slate-700 rounded">📦 Local: <strong>{totalDirect}</strong></span>
               <span className="px-2 py-1 bg-purple-900/50 rounded text-purple-300">💻 LAN: <strong>{totalLAN}</strong></span>
               <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">🌐 Internet: <strong>{totalInternet}</strong></span>
@@ -250,19 +252,22 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               <button disabled={batchLoading} onClick={async () => {
                 setBatchLoading(true);
                 const mcpServers = { ...agentContent.mcpServers };
-                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], disabled: true };
-                await saveToGitHub(mcpServers, `feat: disable ${deploySelected.size} servers`);
+                const eligible = [...deploySelected].filter(n => (mcpServers[n]?.priority || 'standard') !== 'critical');
+                if (!eligible.length) { showNotification('Aucun serveur éligible (critiques exclus)', 'error'); setBatchLoading(false); return; }
+                for (const n of eligible) mcpServers[n] = { ...mcpServers[n], disabled: true };
+                await saveToGitHub(mcpServers, `feat: disable ${eligible.length} servers`);
                 setDeploySelected(new Set()); setBatchLoading(false);
               }} className="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🔴 Désactiver</button>
               <button disabled={batchLoading} onClick={async () => {
                 setBatchLoading(true);
                 try {
-                  // Exclude Internet servers from batch
+                  // Exclude Internet + critical servers from batch
                   const eligible = [...deploySelected].filter(n => {
                     const c = agentContent.mcpServers[n];
+                    if ((c.priority || 'standard') === 'critical') return false;
                     return !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
                   });
-                  if (!eligible.length) { showNotification('Aucun serveur éligible (Internet exclus)', 'error'); setBatchLoading(false); return; }
+                  if (!eligible.length) { showNotification('Aucun serveur éligible (Internet/critiques exclus)', 'error'); setBatchLoading(false); return; }
                   const updates = eligible.map(n => ({ serverName: n, target: 'pcalt' }));
                   const result = await api.batchUpdateTargets(updates, selectedBranch);
                   setRegistry(result.registry);
@@ -283,11 +288,13 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               <button disabled={batchLoading} onClick={async () => {
                 setBatchLoading(true);
                 try {
-                  const updates = [...deploySelected].map(n => ({ serverName: n, target: 'envy' }));
+                  const eligible = [...deploySelected].filter(n => (agentContent.mcpServers[n]?.priority || 'standard') !== 'critical');
+                  if (!eligible.length) { showNotification('Aucun serveur éligible (critiques exclus)', 'error'); setBatchLoading(false); return; }
+                  const updates = eligible.map(n => ({ serverName: n, target: 'envy' }));
                   const result = await api.batchUpdateTargets(updates, selectedBranch);
                   setRegistry(result.registry);
                   const mcpServers = { ...agentContent.mcpServers };
-                  for (const n of deploySelected) {
+                  for (const n of eligible) {
                     const cfg = mcpServers[n];
                     if (cfg._original) {
                       mcpServers[n] = { ...cfg, command: cfg._original.command, args: cfg._original.args, disabled: false };
@@ -302,6 +309,20 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
                 setBatchLoading(false);
               }} className="px-3 py-1 bg-slate-600 hover:bg-slate-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">📦 → Local</button>
+              <button disabled={batchLoading} onClick={async () => {
+                setBatchLoading(true);
+                const mcpServers = { ...agentContent.mcpServers };
+                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], priority: 'critical' };
+                await saveToGitHub(mcpServers, `feat: set ${deploySelected.size} servers as critical`);
+                setDeploySelected(new Set()); setBatchLoading(false);
+              }} className="px-3 py-1 bg-red-900 hover:bg-red-800 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🔴 Critique</button>
+              <button disabled={batchLoading} onClick={async () => {
+                setBatchLoading(true);
+                const mcpServers = { ...agentContent.mcpServers };
+                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], priority: 'standard' };
+                await saveToGitHub(mcpServers, `feat: set ${deploySelected.size} servers as normal`);
+                setDeploySelected(new Set()); setBatchLoading(false);
+              }} className="px-3 py-1 bg-yellow-900 hover:bg-yellow-800 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🟡 Normal</button>
               {batchLoading && <span className="text-xs text-purple-300 animate-pulse">⏳ En cours...</span>}
             </div>
           )}
@@ -316,6 +337,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                     }} checked={deploySelected.size > 0 && deploySelected.size === Object.keys(agentContent.mcpServers || {}).length} className="accent-purple-500" />
                   </th>
                   <th className="text-left py-2 px-3">Serveur</th>
+                  <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'priority', asc: s.key === 'priority' ? !s.asc : true }))}>Priorité {deploySort.key === 'priority' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3">Santé <button onClick={reloadHealth} className="text-slate-500 hover:text-white ml-1 active:scale-75 transition-transform" title="Rafraîchir">🔄</button></th>
@@ -326,11 +348,13 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   const reg = registry[name];
                   const cfg = agentContent.mcpServers[name];
                   const isInternet = cfg?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
-                  return { name, reg, cfg, isInternet, disabled: !!cfg.disabled, ressource: isInternet ? 'internet' : (reg && reg.target !== 'envy') ? reg.target : '' };
+                  const priority = cfg.priority || 'standard';
+                  return { name, reg, cfg, isInternet, disabled: !!cfg.disabled, priority, ressource: isInternet ? 'internet' : (reg && reg.target !== 'envy') ? reg.target : '' };
                 }).sort((a, b) => {
                   if (!deploySort.key) return 0;
                   let va, vb;
                   switch (deploySort.key) {
+                    case 'priority': { const o = {critical:0,standard:1,occasional:2}; va = o[a.priority]||1; vb = o[b.priority]||1; break; }
                     case 'etat': va = a.disabled ? 1 : 0; vb = b.disabled ? 1 : 0; break;
                     case 'ressource': va = a.ressource; vb = b.ressource; break;
                     default: return 0;
@@ -338,7 +362,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   if (va < vb) return deploySort.asc ? -1 : 1;
                   if (va > vb) return deploySort.asc ? 1 : -1;
                   return 0;
-                }).map(({ name, reg, cfg, isInternet }) => {
+                }).map(({ name, reg, cfg, isInternet, priority }) => {
                   return (
                     <tr key={name} className="border-b border-slate-700/50 hover:bg-slate-700/30">
                       <td className="py-2 px-2">
@@ -349,8 +373,19 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                         }} className="accent-purple-500" />
                       </td>
                       <td className="py-2 px-3 font-medium">{name}</td>
+                      <td className="py-2 px-3">
+                        <button onClick={async () => {
+                          const next = priority === 'critical' ? 'standard' : 'critical';
+                          const mcpServers = { ...agentContent.mcpServers };
+                          mcpServers[name] = { ...mcpServers[name], priority: next };
+                          await saveToGitHub(mcpServers, `feat: set ${name} priority to ${next}`);
+                        }} className="active:scale-75 transition-transform" title={priority}>
+                          {priority === 'critical' ? '🔴' : '🟡'}
+                        </button>
+                      </td>
                       <td className="py-2 px-3 border-l border-slate-700">
                         <button onClick={async () => {
+                          if (priority === 'critical' && !confirm(`⚠️ ${name} est critique. Désactiver quand même ?`)) return;
                           const mcpServers = { ...agentContent.mcpServers };
                           mcpServers[name] = { ...mcpServers[name], disabled: !mcpServers[name].disabled };
                           const action = mcpServers[name].disabled ? 'disable' : 'enable';
