@@ -126,6 +126,11 @@ export const api = {
     return res.json();
   },
 
+  async getResources() {
+    const res = await fetch(`${API_URL}/api/resources`);
+    return res.json();
+  },
+
   async applyRemoteConfig(agent, branch) {
     const res = await fetch(`${API_URL}/api/apply-remote-config`, {
       method: 'POST',

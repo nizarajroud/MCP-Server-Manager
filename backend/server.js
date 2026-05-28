@@ -524,6 +524,55 @@ app.post('/api/servers-registry/batch', async (req, res) => {
   }
 });
 
+// GET /api/resources — Local process resource consumption per MCP server
+app.get('/api/resources', async (req, res) => {
+  try {
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+    // Get all node/python/uvx processes with CPU and MEM
+    const { stdout } = await execAsync("ps aux --no-headers | grep -E 'mcp|supergateway|context7|firecrawl|mermaid|youtube|notebooklm|sequential|airtable|telegram|ticktick|github|gmail|notion|aws-api|eks-mcp|bookmarks|excel|pdf-reader|memory.*server|fetch.*mcp' | grep -v grep");
+    const lines = stdout.trim().split('\n').filter(Boolean);
+    const results = {};
+    for (const line of lines) {
+      const parts = line.trim().split(/\s+/);
+      const cpu = parseFloat(parts[2]) || 0;
+      const mem = parseFloat(parts[3]) || 0;
+      const memKB = parseInt(parts[5]) || 0;
+      const cmd = parts.slice(10).join(' ');
+      // Match server name from command
+      const serverNames = Object.keys(req.query).length ? [] : null;
+      // Find which MCP server this process belongs to
+      let matched = null;
+      const patterns = [
+        ['context7', 'context7'], ['firecrawl', 'firecrawl'], ['mcp-mermaid', 'mermaid'],
+        ['youtube-transcript', 'youtube'], ['notebooklm', 'notebooklm'], ['sequential-thinking', 'sequential'],
+        ['airtable', 'airtable'], ['telegram', 'telegram'], ['ticktick', 'ticktick'],
+        ['github', 'github_wrapper\\|server-github'], ['gmail', 'gmail'], ['notion-workspace', 'notion'],
+        ['awslabs.aws-api-mcp-server', 'aws_api_mcp\\|aws-api'], ['awslabs.eks-mcp-server', 'eks_mcp\\|eks-mcp'],
+        ['memory', 'server-memory'], ['time', 'server-time'], ['excel', 'excel-mcp\\|excel'],
+        ['bookmarks', 'bookmarks'], ['pdf-reader', 'pdf-reader'], ['fetch', 'server-fetch\\|mcp-server-fetch']
+      ];
+      for (const [name, pattern] of patterns) {
+        if (new RegExp(pattern).test(cmd)) { matched = name; break; }
+      }
+      if (matched) {
+        if (!results[matched]) results[matched] = { cpu: 0, memMB: 0 };
+        results[matched].cpu += cpu;
+        results[matched].memMB += Math.round(memKB / 1024);
+      }
+    }
+    // Classify: heavy if > 5% CPU or > 200MB
+    const classified = {};
+    for (const [name, data] of Object.entries(results)) {
+      classified[name] = { ...data, weight: (data.cpu > 5 || data.memMB > 200) ? 'heavy' : 'light' };
+    }
+    res.json(classified);
+  } catch (e) {
+    res.json({});
+  }
+});
+
 // GET /api/health — TCP port check on remote servers
 app.get('/api/health', async (req, res) => {
   try {

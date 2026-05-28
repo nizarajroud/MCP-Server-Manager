@@ -8,7 +8,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, categories, setCategories, registry, health, saveToGitHub, showNotification, reloadAgent, reloadRegistry, setRegistry, reloadHealth, api }) => {
+const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, categories, setCategories, registry, health, resources, saveToGitHub, showNotification, reloadAgent, reloadRegistry, setRegistry, reloadHealth, api }) => {
   const [subTab, setSubTab] = useState('general');
   const [deploySort, setDeploySort] = useState({ key: null, asc: true });
   const [deploySearch, setDeploySearch] = useState('');
@@ -341,6 +341,9 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                       </select>
                     )}
                   </td>
+                  <td className="py-2 px-3 w-12" title={resources[name] ? `CPU: ${resources[name].cpu}% | MEM: ${resources[name].memMB}MB` : 'Non mesuré'}>
+                    {resources[name] ? (resources[name].weight === 'heavy' ? '🔥' : '🍃') : '—'}
+                  </td>
                   <td className="py-2 px-3 w-12">
                     {health[name] ? <span className={`w-2 h-2 inline-block rounded-full ${health[name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} /> : '—'}
                   </td>
@@ -452,6 +455,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   <th className="text-left py-2 px-3 w-16">Priorité</th>
                   <th className="text-left py-2 px-3 w-12">État</th>
                   <th className="text-left py-2 px-3 w-28">Ressource</th>
+                  <th className="text-left py-2 px-3 w-12" title="Consommation Locale">CL</th>
                   <th className="text-left py-2 px-3 w-12">Santé</th>
                 </tr>
               </thead>
