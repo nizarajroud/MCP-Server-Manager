@@ -252,10 +252,30 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             if (!grouped[cat]) grouped[cat] = [];
             grouped[cat].push(name);
           }
-          // Sort by memory descending when heavy filter is active
+          // Sort within categories
           if (filterType === 'heavy') {
             for (const cat of Object.keys(grouped)) {
               grouped[cat].sort((a, b) => ((resources[b]?.memMB || 0) - (resources[a]?.memMB || 0)));
+            }
+          } else if (deploySort.key) {
+            const getSortVal = (n) => {
+              const c = agentContent.mcpServers[n];
+              const r = registry[n];
+              const isInet = c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
+              switch (deploySort.key) {
+                case 'priority': return (c.priority || 'standard') === 'critical' ? 0 : 1;
+                case 'etat': return c.disabled ? 1 : 0;
+                case 'ressource': return isInet ? 'internet' : (r && r.target !== 'envy') ? r.target : 'local';
+                default: return 0;
+              }
+            };
+            for (const cat of Object.keys(grouped)) {
+              grouped[cat].sort((a, b) => {
+                const va = getSortVal(a), vb = getSortVal(b);
+                if (va < vb) return deploySort.asc ? -1 : 1;
+                if (va > vb) return deploySort.asc ? 1 : -1;
+                return 0;
+              });
             }
           }
           return grouped;
@@ -460,9 +480,9 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                     }} checked={deploySelected.size > 0 && deploySelected.size === Object.values(grouped).flat().length} className="accent-purple-500" />
                   </th>
                   <th className="text-left py-2 px-3">Serveur</th>
-                  <th className="text-left py-2 px-3 w-16">Priorité</th>
-                  <th className="text-left py-2 px-3 w-12">État</th>
-                  <th className="text-left py-2 px-3 w-28">Ressource</th>
+                  <th className="text-left py-2 px-3 w-16 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'priority', asc: s.key === 'priority' ? !s.asc : true }))}>Priorité {deploySort.key === 'priority' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
+                  <th className="text-left py-2 px-3 w-12 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
+                  <th className="text-left py-2 px-3 w-28 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3 w-12" title="Consommation Locale">CL</th>
                   <th className="text-left py-2 px-3 w-12">Santé</th>
                 </tr>
