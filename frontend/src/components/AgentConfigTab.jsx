@@ -309,6 +309,20 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
                 setBatchLoading(false);
               }} className="px-3 py-1 bg-slate-600 hover:bg-slate-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">📦 → Local</button>
+              <button disabled={batchLoading} onClick={async () => {
+                setBatchLoading(true);
+                const mcpServers = { ...agentContent.mcpServers };
+                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], priority: 'critical' };
+                await saveToGitHub(mcpServers, `feat: set ${deploySelected.size} servers as critical`);
+                setDeploySelected(new Set()); setBatchLoading(false);
+              }} className="px-3 py-1 bg-red-900 hover:bg-red-800 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🔴 Critique</button>
+              <button disabled={batchLoading} onClick={async () => {
+                setBatchLoading(true);
+                const mcpServers = { ...agentContent.mcpServers };
+                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], priority: 'standard' };
+                await saveToGitHub(mcpServers, `feat: set ${deploySelected.size} servers as normal`);
+                setDeploySelected(new Set()); setBatchLoading(false);
+              }} className="px-3 py-1 bg-yellow-900 hover:bg-yellow-800 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🟡 Normal</button>
               {batchLoading && <span className="text-xs text-purple-300 animate-pulse">⏳ En cours...</span>}
             </div>
           )}
