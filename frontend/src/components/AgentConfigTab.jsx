@@ -399,11 +399,11 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             <input type="text" placeholder="🔍 Rechercher un serveur..." value={deploySearch || ''} onChange={e => setDeploySearch(e.target.value)}
               className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-72" />
             <div className="flex items-center gap-2">
-              <button onClick={() => setCollapsedCats(new Set(Object.keys(grouped)))} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
-                <ChevronsUp size={14} /> Collapse
-              </button>
-              <button onClick={() => setCollapsedCats(new Set())} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
-                <ChevronsDown size={14} /> Expand
+              <button onClick={() => {
+                const allCats = Object.keys(grouped);
+                setCollapsedCats(collapsedCats.size === allCats.length ? new Set() : new Set(allCats));
+              }} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
+                {collapsedCats.size === Object.keys(grouped).length ? <><ChevronsDown size={14} /> Expand</> : <><ChevronsUp size={14} /> Collapse</>}
               </button>
               <button onClick={reloadHealth} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs active:scale-75 transition-transform" title="Rafraîchir santé">🔄 Santé</button>
             </div>
