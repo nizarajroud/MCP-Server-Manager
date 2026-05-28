@@ -308,7 +308,6 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   </td>
                   <td className="py-2 px-3 w-12">
                     <button onClick={async () => {
-                      if (priority === 'critical' && !confirm(`⚠️ ${name} est critique. Désactiver quand même ?`)) return;
                       const mcpServers = { ...agentContent.mcpServers };
                       mcpServers[name] = { ...mcpServers[name], disabled: !mcpServers[name].disabled };
                       await saveToGitHub(mcpServers, `feat: ${mcpServers[name].disabled ? 'disable' : 'enable'} ${name}`);
