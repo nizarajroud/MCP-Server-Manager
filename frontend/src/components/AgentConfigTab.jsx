@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Save } from 'lucide-react';
+import { Save, GripVertical, ChevronsUp, ChevronsDown } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { json } from '@codemirror/lang-json';
@@ -7,12 +8,15 @@ import { oneDark } from '@codemirror/theme-one-dark';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, registry, health, saveToGitHub, showNotification, reloadAgent, reloadRegistry, setRegistry, reloadHealth, api }) => {
+const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, categories, setCategories, registry, health, resources, saveToGitHub, showNotification, reloadAgent, reloadRegistry, setRegistry, reloadHealth, api }) => {
   const [subTab, setSubTab] = useState('general');
   const [deploySort, setDeploySort] = useState({ key: null, asc: true });
   const [deploySearch, setDeploySearch] = useState('');
   const [deploySelected, setDeploySelected] = useState(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
+  const [collapsedCats, setCollapsedCats] = useState(new Set());
+  const [filterCritical, setFilterCritical] = useState(false);
+  const [filterType, setFilterType] = useState(null);
   const [form, setForm] = useState({ name: '', description: '', welcomeMessage: '' });
   const [promptContent, setPromptContent] = useState('');
   const [promptFilePath, setPromptFilePath] = useState('');
@@ -220,24 +224,184 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
         const totalDirect = allServers.length - totalInternet - totalLAN;
         const totalEnabled = allServers.filter(n => !agentContent.mcpServers[n].disabled).length;
         const totalCritical = allServers.filter(n => (agentContent.mcpServers[n].priority || 'standard') === 'critical').length;
+
+        const getServerCategory = (name) => {
+          for (const [cat, list] of Object.entries(categories)) {
+            if (list.includes(name)) return cat;
+          }
+          return '📦 Non catégorisé';
+        };
+
+        const getGrouped = () => {
+          const grouped = {};
+          const filtered = allServers.filter(n => {
+            if (deploySearch && !n.toLowerCase().includes(deploySearch.toLowerCase())) return false;
+            if (filterCritical && (agentContent.mcpServers[n].priority || 'standard') !== 'critical') return false;
+            const c = agentContent.mcpServers[n];
+            const isInet = c.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
+            const isLan = c.args?.includes('mcp-remote') && !isInet;
+            if (filterType === 'local' && (isInet || isLan)) return false;
+            if (filterType === 'lan' && !isLan) return false;
+            if (filterType === 'internet' && !isInet) return false;
+            if (filterType === 'actifs' && c.disabled) return false;
+            if (filterType === 'heavy' && (!resources[n] || resources[n].weight !== 'heavy')) return false;
+            return true;
+          });
+          for (const name of filtered) {
+            const cat = getServerCategory(name);
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(name);
+          }
+          // Sort within categories
+          if (filterType === 'heavy') {
+            for (const cat of Object.keys(grouped)) {
+              grouped[cat].sort((a, b) => ((resources[b]?.memMB || 0) - (resources[a]?.memMB || 0)));
+            }
+          } else if (deploySort.key) {
+            const getSortVal = (n) => {
+              const c = agentContent.mcpServers[n];
+              const r = registry[n];
+              const isInet = c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
+              switch (deploySort.key) {
+                case 'priority': return (c.priority || 'standard') === 'critical' ? 0 : 1;
+                case 'etat': return c.disabled ? 1 : 0;
+                case 'ressource': return isInet ? 'internet' : (r && r.target !== 'envy') ? r.target : 'local';
+                case 'cl': return resources[n]?.memMB || 0;
+                default: return 0;
+              }
+            };
+            for (const cat of Object.keys(grouped)) {
+              grouped[cat].sort((a, b) => {
+                const va = getSortVal(a), vb = getSortVal(b);
+                if (va < vb) return deploySort.asc ? -1 : 1;
+                if (va > vb) return deploySort.asc ? 1 : -1;
+                return 0;
+              });
+            }
+          }
+          return grouped;
+        };
+
+        const onDragEnd = async (result) => {
+          const { draggableId, destination, source } = result;
+          if (!destination || destination.droppableId === source.droppableId) return;
+          const serverName = draggableId;
+          const newCat = destination.droppableId;
+          const oldCat = source.droppableId;
+          const updated = { ...categories };
+          if (oldCat !== '📦 Non catégorisé' && updated[oldCat]) {
+            updated[oldCat] = updated[oldCat].filter(s => s !== serverName);
+          }
+          if (newCat !== '📦 Non catégorisé') {
+            if (!updated[newCat]) updated[newCat] = [];
+            if (!updated[newCat].includes(serverName)) updated[newCat].push(serverName);
+          }
+          setCategories(updated);
+          try {
+            await api.saveCategories(updated, selectedBranch, `feat: move ${serverName} to ${newCat}`);
+            showNotification(`${serverName} → ${newCat} ✓`);
+          } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
+        };
+
+        const grouped = getGrouped();
+
+        const renderRow = (name, index) => {
+          const cfg = agentContent.mcpServers[name];
+          const reg = registry[name];
+          const isInternet = cfg?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
+          const priority = cfg.priority || 'standard';
+          return (
+            <Draggable key={name} draggableId={name} index={index}>
+              {(provided, snapshot) => (
+                <tr ref={provided.innerRef} {...provided.draggableProps}
+                  className={`border-b border-slate-700/50 hover:bg-slate-700/30 ${snapshot.isDragging ? 'bg-purple-900/20' : ''}`}>
+                  <td className="py-2 px-1 w-8" {...provided.dragHandleProps}>
+                    <GripVertical size={14} className="text-slate-500 hover:text-slate-300 cursor-grab" />
+                  </td>
+                  <td className="py-2 px-2 w-8">
+                    <input type="checkbox" checked={deploySelected.has(name)} onChange={() => {
+                      const s = new Set(deploySelected); s.has(name) ? s.delete(name) : s.add(name); setDeploySelected(s);
+                    }} className="accent-purple-500" />
+                  </td>
+                  <td className="py-2 px-3 font-medium text-sm">{name}</td>
+                  <td className="py-2 px-3 w-16">
+                    <button onClick={async () => {
+                      const next = priority === 'critical' ? 'standard' : 'critical';
+                      const mcpServers = { ...agentContent.mcpServers };
+                      mcpServers[name] = { ...mcpServers[name], priority: next };
+                      await saveToGitHub(mcpServers, `feat: set ${name} priority to ${next}`);
+                    }} className="active:scale-75 transition-transform" title={priority}>
+                      {priority === 'critical' ? '⭐' : '○'}
+                    </button>
+                  </td>
+                  <td className="py-2 px-3 w-12">
+                    <button onClick={async () => {
+                      const mcpServers = { ...agentContent.mcpServers };
+                      mcpServers[name] = { ...mcpServers[name], disabled: !mcpServers[name].disabled };
+                      await saveToGitHub(mcpServers, `feat: ${mcpServers[name].disabled ? 'disable' : 'enable'} ${name}`);
+                    }} className={`transition active:scale-75 ${cfg.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
+                      {cfg.disabled ? '🔴' : '🟢'}
+                    </button>
+                  </td>
+                  <td className="py-2 px-3 w-28">
+                    {isInternet ? (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>
+                    ) : (
+                      <select value={reg?.target === 'envy' || !reg ? 'local' : reg.target} onChange={async (e) => {
+                        try {
+                          const target = e.target.value === 'local' ? 'envy' : e.target.value;
+                          const result = await api.updateServerTarget(name, target, selectedBranch);
+                          const mcpServers = { ...agentContent.mcpServers };
+                          const serverCfg = mcpServers[name];
+                          if (target === 'envy') {
+                            if (serverCfg._original) { mcpServers[name] = { ...serverCfg, command: serverCfg._original.command, args: serverCfg._original.args, disabled: false }; delete mcpServers[name]._original; }
+                            else { mcpServers[name] = { ...serverCfg, disabled: false }; }
+                          } else {
+                            const port = result.port;
+                            if (port) { mcpServers[name] = { ...serverCfg, _original: serverCfg._original || { command: serverCfg.command, args: serverCfg.args }, command: 'npx', args: ['mcp-remote', `http://192.168.2.56:${port}/mcp`, '--allow-http'], disabled: false }; }
+                          }
+                          await saveToGitHub(mcpServers, `feat: ${target === 'envy' ? 'restore local' : 'switch to remote'} ${name}`);
+                          reloadRegistry(); reloadHealth();
+                        } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
+                      }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">
+                        <option value="local">📦 Local</option>
+                        <option value="pcalt">💻 pcalt</option>
+                      </select>
+                    )}
+                  </td>
+                  <td className="py-2 px-3 w-12" title={resources[name] ? `CPU: ${resources[name].cpu}% | MEM: ${resources[name].memMB}MB` : 'Non mesuré'}>
+                    {resources[name] ? (resources[name].weight === 'heavy' ? '🔥' : '🍃') : '—'}
+                  </td>
+                  <td className="py-2 px-3 w-12">
+                    {health[name] ? <span className={`w-2 h-2 inline-block rounded-full ${health[name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} /> : '—'}
+                  </td>
+                </tr>
+              )}
+            </Draggable>
+          );
+        };
+
         return (
         <div className="space-y-4">
           <div className="flex gap-4 items-center flex-wrap">
             <div className="flex gap-3 text-sm flex-wrap">
               <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
-              <span className="px-2 py-1 bg-red-900/50 rounded text-red-300">🔴 Critiques: <strong>{totalCritical}</strong></span>
-              <span className="px-2 py-1 bg-slate-700 rounded">📦 Local: <strong>{totalDirect}</strong></span>
-              <span className="px-2 py-1 bg-purple-900/50 rounded text-purple-300">💻 LAN: <strong>{totalLAN}</strong></span>
-              <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">🌐 Internet: <strong>{totalInternet}</strong></span>
-              <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">✓ Actifs: <strong>{totalEnabled}</strong></span>
+              <span onClick={() => { setFilterCritical(!filterCritical); setFilterType(null); if (!filterCritical) setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterCritical ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
+              <span onClick={() => { setFilterType(filterType === 'local' ? null : 'local'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'local' ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 Local: <strong>{totalDirect}</strong></span>
+              <span onClick={() => { setFilterType(filterType === 'lan' ? null : 'lan'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'lan' ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
+              <span onClick={() => { setFilterType(filterType === 'internet' ? null : 'internet'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'internet' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
+              <span onClick={() => { setFilterType(filterType === 'actifs' ? null : 'actifs'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'actifs' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
+              <span onClick={() => { setFilterType(filterType === 'heavy' ? null : 'heavy'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'heavy' ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.values(resources).filter(r => r.weight === 'heavy').length}</strong></span>
             </div>
-            <input
-              type="text"
-              placeholder="Rechercher un serveur..."
-              value={deploySearch || ''}
-              onChange={e => setDeploySearch(e.target.value)}
-              className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-64"
-            />
+            <input type="text" placeholder="Rechercher..." value={deploySearch || ''} onChange={e => setDeploySearch(e.target.value)}
+              className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-64" />
+            <button onClick={() => setCollapsedCats(new Set(Object.keys(grouped)))} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
+              <ChevronsUp size={14} /> Collapse All
+            </button>
+            <button onClick={() => setCollapsedCats(new Set())} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
+              <ChevronsDown size={14} /> Expand All
+            </button>
+            <button onClick={reloadHealth} className="text-slate-500 hover:text-white active:scale-75 transition-transform" title="Rafraîchir santé">🔄</button>
           </div>
           {deploySelected.size > 0 && (
             <div className="flex items-center gap-3 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600 flex-wrap">
@@ -253,7 +417,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 setBatchLoading(true);
                 const mcpServers = { ...agentContent.mcpServers };
                 const eligible = [...deploySelected].filter(n => (mcpServers[n]?.priority || 'standard') !== 'critical');
-                if (!eligible.length) { showNotification('Aucun serveur éligible (critiques exclus)', 'error'); setBatchLoading(false); return; }
+                if (!eligible.length) { showNotification('Critiques exclus', 'error'); setBatchLoading(false); return; }
                 for (const n of eligible) mcpServers[n] = { ...mcpServers[n], disabled: true };
                 await saveToGitHub(mcpServers, `feat: disable ${eligible.length} servers`);
                 setDeploySelected(new Set()); setBatchLoading(false);
@@ -261,27 +425,15 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               <button disabled={batchLoading} onClick={async () => {
                 setBatchLoading(true);
                 try {
-                  // Exclude Internet + critical servers from batch
-                  const eligible = [...deploySelected].filter(n => {
-                    const c = agentContent.mcpServers[n];
-                    if ((c.priority || 'standard') === 'critical') return false;
-                    return !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
-                  });
-                  if (!eligible.length) { showNotification('Aucun serveur éligible (Internet/critiques exclus)', 'error'); setBatchLoading(false); return; }
+                  const eligible = [...deploySelected].filter(n => { const c = agentContent.mcpServers[n]; return (c.priority || 'standard') !== 'critical' && !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); });
+                  if (!eligible.length) { showNotification('Aucun éligible', 'error'); setBatchLoading(false); return; }
                   const updates = eligible.map(n => ({ serverName: n, target: 'pcalt' }));
                   const result = await api.batchUpdateTargets(updates, selectedBranch);
                   setRegistry(result.registry);
                   const mcpServers = { ...agentContent.mcpServers };
-                  for (const n of eligible) {
-                    const r = result.registry[n];
-                    if (r && r.port) {
-                      const cfg = mcpServers[n];
-                      mcpServers[n] = { ...cfg, _original: cfg._original || { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false };
-                    }
-                  }
+                  for (const n of eligible) { const r = result.registry[n]; if (r?.port) { const cfg = mcpServers[n]; mcpServers[n] = { ...cfg, _original: cfg._original || { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false }; } }
                   await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to pcalt`);
-                  await reloadHealth();
-                  setDeploySelected(new Set());
+                  await reloadHealth(); setDeploySelected(new Set());
                 } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
                 setBatchLoading(false);
               }} className="px-3 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">💻 → pcalt</button>
@@ -289,23 +441,14 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 setBatchLoading(true);
                 try {
                   const eligible = [...deploySelected].filter(n => (agentContent.mcpServers[n]?.priority || 'standard') !== 'critical');
-                  if (!eligible.length) { showNotification('Aucun serveur éligible (critiques exclus)', 'error'); setBatchLoading(false); return; }
+                  if (!eligible.length) { showNotification('Critiques exclus', 'error'); setBatchLoading(false); return; }
                   const updates = eligible.map(n => ({ serverName: n, target: 'envy' }));
                   const result = await api.batchUpdateTargets(updates, selectedBranch);
                   setRegistry(result.registry);
                   const mcpServers = { ...agentContent.mcpServers };
-                  for (const n of eligible) {
-                    const cfg = mcpServers[n];
-                    if (cfg._original) {
-                      mcpServers[n] = { ...cfg, command: cfg._original.command, args: cfg._original.args, disabled: false };
-                      delete mcpServers[n]._original;
-                    } else {
-                      mcpServers[n] = { ...cfg, disabled: false };
-                    }
-                  }
-                  await saveToGitHub(mcpServers, `feat: move ${deploySelected.size} servers to local`);
-                  await reloadHealth();
-                  setDeploySelected(new Set());
+                  for (const n of eligible) { const cfg = mcpServers[n]; if (cfg._original) { mcpServers[n] = { ...cfg, command: cfg._original.command, args: cfg._original.args, disabled: false }; delete mcpServers[n]._original; } else { mcpServers[n] = { ...cfg, disabled: false }; } }
+                  await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to local`);
+                  await reloadHealth(); setDeploySelected(new Set());
                 } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
                 setBatchLoading(false);
               }} className="px-3 py-1 bg-slate-600 hover:bg-slate-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">📦 → Local</button>
@@ -326,132 +469,48 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               {batchLoading && <span className="text-xs text-purple-300 animate-pulse">⏳ En cours...</span>}
             </div>
           )}
-          <div className="overflow-x-auto">
+          <DragDropContext onDragEnd={onDragEnd}>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-600 text-slate-400">
-                  <th className="py-2 px-2">
+                <tr className="border-b border-slate-600 text-slate-400 text-xs">
+                  <th className="py-2 px-1 w-8"></th>
+                  <th className="py-2 px-2 w-8">
                     <input type="checkbox" onChange={(e) => {
-                      const all = Object.keys(agentContent.mcpServers || {});
-                      setDeploySelected(e.target.checked ? new Set(all) : new Set());
-                    }} checked={deploySelected.size > 0 && deploySelected.size === Object.keys(agentContent.mcpServers || {}).length} className="accent-purple-500" />
+                      const visible = Object.values(grouped).flat();
+                      setDeploySelected(e.target.checked ? new Set(visible) : new Set());
+                    }} checked={deploySelected.size > 0 && deploySelected.size === Object.values(grouped).flat().length} className="accent-purple-500" />
                   </th>
                   <th className="text-left py-2 px-3">Serveur</th>
-                  <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'priority', asc: s.key === 'priority' ? !s.asc : true }))}>Priorité {deploySort.key === 'priority' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
-                  <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
-                  <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
-                  <th className="text-left py-2 px-3">Santé <button onClick={reloadHealth} className="text-slate-500 hover:text-white ml-1 active:scale-75 transition-transform" title="Rafraîchir">🔄</button></th>
+                  <th className="text-left py-2 px-3 w-16 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'priority', asc: s.key === 'priority' ? !s.asc : true }))}>Priorité {deploySort.key === 'priority' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
+                  <th className="text-left py-2 px-3 w-12 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
+                  <th className="text-left py-2 px-3 w-28 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
+                  <th className="text-left py-2 px-3 w-12 cursor-pointer hover:text-white" title="Consommation Locale" onClick={() => setDeploySort(s => ({ key: 'cl', asc: s.key === 'cl' ? !s.asc : true }))}>CL {deploySort.key === 'cl' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
+                  <th className="text-left py-2 px-3 w-12">Santé</th>
                 </tr>
               </thead>
-              <tbody>
-                {Object.keys(agentContent.mcpServers || {}).filter(name => !deploySearch || name.toLowerCase().includes(deploySearch.toLowerCase())).map(name => {
-                  const reg = registry[name];
-                  const cfg = agentContent.mcpServers[name];
-                  const isInternet = cfg?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
-                  const priority = cfg.priority || 'standard';
-                  return { name, reg, cfg, isInternet, disabled: !!cfg.disabled, priority, ressource: isInternet ? 'internet' : (reg && reg.target !== 'envy') ? reg.target : '' };
-                }).sort((a, b) => {
-                  if (!deploySort.key) return 0;
-                  let va, vb;
-                  switch (deploySort.key) {
-                    case 'priority': { const o = {critical:0,standard:1,occasional:2}; va = o[a.priority]||1; vb = o[b.priority]||1; break; }
-                    case 'etat': va = a.disabled ? 1 : 0; vb = b.disabled ? 1 : 0; break;
-                    case 'ressource': va = a.ressource; vb = b.ressource; break;
-                    default: return 0;
-                  }
-                  if (va < vb) return deploySort.asc ? -1 : 1;
-                  if (va > vb) return deploySort.asc ? 1 : -1;
-                  return 0;
-                }).map(({ name, reg, cfg, isInternet, priority }) => {
-                  return (
-                    <tr key={name} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                      <td className="py-2 px-2">
-                        <input type="checkbox" checked={deploySelected.has(name)} onChange={() => {
-                          const s = new Set(deploySelected);
-                          s.has(name) ? s.delete(name) : s.add(name);
-                          setDeploySelected(s);
-                        }} className="accent-purple-500" />
-                      </td>
-                      <td className="py-2 px-3 font-medium">{name}</td>
-                      <td className="py-2 px-3">
-                        <button onClick={async () => {
-                          const next = priority === 'critical' ? 'standard' : 'critical';
-                          const mcpServers = { ...agentContent.mcpServers };
-                          mcpServers[name] = { ...mcpServers[name], priority: next };
-                          await saveToGitHub(mcpServers, `feat: set ${name} priority to ${next}`);
-                        }} className="active:scale-75 transition-transform" title={priority}>
-                          {priority === 'critical' ? '🔴' : '🟡'}
-                        </button>
-                      </td>
-                      <td className="py-2 px-3 border-l border-slate-700">
-                        <button onClick={async () => {
-                          if (priority === 'critical' && !confirm(`⚠️ ${name} est critique. Désactiver quand même ?`)) return;
-                          const mcpServers = { ...agentContent.mcpServers };
-                          mcpServers[name] = { ...mcpServers[name], disabled: !mcpServers[name].disabled };
-                          const action = mcpServers[name].disabled ? 'disable' : 'enable';
-                          try {
-                            await saveToGitHub(mcpServers, `feat: ${action} ${name}`);
-                          } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
-                        }} className={`transition active:scale-75 ${cfg.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
-                          {cfg.disabled ? '🔴' : '🟢'}
-                        </button>
-                      </td>
-                      <td className="py-2 px-3">
-                        {isInternet ? (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>
-                        ) : (
-                          <select value={reg?.target === 'envy' || !reg ? 'local' : reg.target} onChange={async (e) => {
-                            try {
-                              const target = e.target.value === 'local' ? 'envy' : e.target.value;
-                              // 1. Update servers.yaml
-                              const result = await api.updateServerTarget(name, target, selectedBranch);
-                              // 2. Update agent JSON (client config)
-                              const mcpServers = { ...agentContent.mcpServers };
-                              const serverCfg = mcpServers[name];
-                              if (target === 'envy') {
-                                // Restore local: use _original if available
-                                if (serverCfg._original) {
-                                  mcpServers[name] = { ...serverCfg, command: serverCfg._original.command, args: serverCfg._original.args, disabled: false };
-                                  delete mcpServers[name]._original;
-                                } else {
-                                  mcpServers[name] = { ...serverCfg, disabled: false };
-                                }
-                              } else {
-                                // Switch to remote: store original + set mcp-remote
-                                const port = result.port;
-                                if (port && !(serverCfg.args && serverCfg.args.includes('mcp-remote'))) {
-                                  mcpServers[name] = {
-                                    ...serverCfg,
-                                    _original: { command: serverCfg.command, args: serverCfg.args },
-                                    command: 'npx',
-                                    args: ['mcp-remote', `http://192.168.2.56:${port}/mcp`, '--allow-http'],
-                                    disabled: false
-                                  };
-                                } else {
-                                  mcpServers[name] = { ...serverCfg, disabled: false };
-                                }
-                              }
-                              await saveToGitHub(mcpServers, `feat: ${target === 'envy' ? 'restore local' : 'switch to remote'} ${name}`);
-                              reloadRegistry();
-                              reloadHealth();
-                            } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
-                          }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">
-                            <option value="local">📦 Local</option>
-                            <option value="pcalt">💻 pcalt</option>
-                          </select>
-                        )}
-                      </td>
-                      <td className="py-2 px-3">
-                        {health[name] ? (
-                          <span className={`w-2 h-2 inline-block rounded-full ${health[name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} />
-                        ) : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
             </table>
-          </div>
+            {Object.entries(grouped).map(([category, servers]) => (
+              <div key={category} className="border border-slate-600 rounded-lg overflow-hidden">
+                <button onClick={() => { const s = new Set(collapsedCats); s.has(category) ? s.delete(category) : s.add(category); setCollapsedCats(s); }}
+                  className="w-full flex items-center justify-between px-4 py-2 bg-slate-700/80 hover:bg-slate-700 transition">
+                  <span className="font-semibold text-sm">{category} <span className="text-slate-400">({servers.length})</span></span>
+                  <span className="text-slate-400">{collapsedCats.has(category) ? '▶' : '▼'}</span>
+                </button>
+                {!collapsedCats.has(category) && (
+                  <Droppable droppableId={category}>
+                    {(provided, snapshot) => (
+                      <table className="w-full text-sm">
+                        <tbody ref={provided.innerRef} {...provided.droppableProps} className={snapshot.isDraggingOver ? 'bg-purple-500/5' : ''}>
+                          {servers.map((name, idx) => renderRow(name, idx))}
+                          {provided.placeholder}
+                        </tbody>
+                      </table>
+                    )}
+                  </Droppable>
+                )}
+              </div>
+            ))}
+          </DragDropContext>
         </div>
         );
       })()}

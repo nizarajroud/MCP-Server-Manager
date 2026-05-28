@@ -24,6 +24,7 @@ const MCPManager = () => {
   const [version, setVersion] = useState('');
   const [registry, setRegistry] = useState({});
   const [health, setHealth] = useState({});
+  const [resources, setResources] = useState({});
 
   useEffect(() => { loadConfig(); }, []);
   useEffect(() => { if (localBranch) loadBranches(); }, [localBranch]);
@@ -32,7 +33,8 @@ const MCPManager = () => {
   useEffect(() => {
     if (!selectedBranch) return;
     loadHealth();
-    const interval = setInterval(loadHealth, 30000);
+    loadResources();
+    const interval = setInterval(() => { loadHealth(); loadResources(); }, 30000);
     return () => clearInterval(interval);
   }, [selectedBranch]);
 
@@ -65,6 +67,10 @@ const MCPManager = () => {
 
   const loadHealth = async () => {
     try { setHealth(await api.getHealth(selectedBranch)); } catch (e) {}
+  };
+
+  const loadResources = async () => {
+    try { setResources(await api.getResources()); } catch (e) {}
   };
 
   const loadBranches = async () => {
@@ -230,8 +236,11 @@ const MCPManager = () => {
               agentContent={agentContent}
               agentSha={agentSha}
               selectedBranch={selectedBranch}
+              categories={categories}
+              setCategories={setCategories}
               registry={registry}
               health={health}
+              resources={resources}
               saveToGitHub={saveToGitHub}
               showNotification={showNotification}
               reloadAgent={loadAgent}
