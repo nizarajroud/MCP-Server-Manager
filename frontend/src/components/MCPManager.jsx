@@ -230,6 +230,8 @@ const MCPManager = () => {
               agentContent={agentContent}
               agentSha={agentSha}
               selectedBranch={selectedBranch}
+              categories={categories}
+              setCategories={setCategories}
               registry={registry}
               health={health}
               saveToGitHub={saveToGitHub}
