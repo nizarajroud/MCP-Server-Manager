@@ -15,6 +15,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
   const [deploySelected, setDeploySelected] = useState(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
   const [collapsedCats, setCollapsedCats] = useState(new Set());
+  const [filterCritical, setFilterCritical] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', welcomeMessage: '' });
   const [promptContent, setPromptContent] = useState('');
   const [promptFilePath, setPromptFilePath] = useState('');
@@ -232,7 +233,11 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
 
         const getGrouped = () => {
           const grouped = {};
-          const filtered = allServers.filter(n => !deploySearch || n.toLowerCase().includes(deploySearch.toLowerCase()));
+          const filtered = allServers.filter(n => {
+            if (deploySearch && !n.toLowerCase().includes(deploySearch.toLowerCase())) return false;
+            if (filterCritical && (agentContent.mcpServers[n].priority || 'standard') !== 'critical') return false;
+            return true;
+          });
           for (const name of filtered) {
             const cat = getServerCategory(name);
             if (!grouped[cat]) grouped[cat] = [];
@@ -343,7 +348,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
           <div className="flex gap-4 items-center flex-wrap">
             <div className="flex gap-3 text-sm flex-wrap">
               <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
-              <span className="px-2 py-1 bg-red-900/50 rounded text-red-300">🔴 Critiques: <strong>{totalCritical}</strong></span>
+              <span onClick={() => { setFilterCritical(!filterCritical); if (!filterCritical) setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterCritical ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
               <span className="px-2 py-1 bg-slate-700 rounded">📦 Local: <strong>{totalDirect}</strong></span>
               <span className="px-2 py-1 bg-purple-900/50 rounded text-purple-300">💻 LAN: <strong>{totalLAN}</strong></span>
               <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">🌐 Internet: <strong>{totalInternet}</strong></span>
