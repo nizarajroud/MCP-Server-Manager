@@ -10,7 +10,7 @@ const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, categories, setCategories, registry, health, resources, saveToGitHub, showNotification, reloadAgent, reloadRegistry, setRegistry, reloadHealth, api }) => {
   const [subTab, setSubTab] = useState('general');
-  const [deploySort, setDeploySort] = useState({ key: null, asc: true });
+  const [deploySort, setDeploySort] = useState({ key: 'cl', asc: false });
   const [deploySearch, setDeploySearch] = useState('');
   const [deploySelected, setDeploySelected] = useState(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
