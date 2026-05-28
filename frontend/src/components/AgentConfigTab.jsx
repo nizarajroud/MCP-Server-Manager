@@ -274,16 +274,16 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               {(provided, snapshot) => (
                 <tr ref={provided.innerRef} {...provided.draggableProps}
                   className={`border-b border-slate-700/50 hover:bg-slate-700/30 ${snapshot.isDragging ? 'bg-purple-900/20' : ''}`}>
-                  <td className="py-2 px-1" {...provided.dragHandleProps}>
+                  <td className="py-2 px-1 w-8" {...provided.dragHandleProps}>
                     <GripVertical size={14} className="text-slate-500 hover:text-slate-300 cursor-grab" />
                   </td>
-                  <td className="py-2 px-2">
+                  <td className="py-2 px-2 w-8">
                     <input type="checkbox" checked={deploySelected.has(name)} onChange={() => {
                       const s = new Set(deploySelected); s.has(name) ? s.delete(name) : s.add(name); setDeploySelected(s);
                     }} className="accent-purple-500" />
                   </td>
                   <td className="py-2 px-3 font-medium text-sm">{name}</td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-3 w-16">
                     <button onClick={async () => {
                       const next = priority === 'critical' ? 'standard' : 'critical';
                       const mcpServers = { ...agentContent.mcpServers };
@@ -293,7 +293,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                       {priority === 'critical' ? '🔴' : '🟡'}
                     </button>
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-3 w-12">
                     <button onClick={async () => {
                       if (priority === 'critical' && !confirm(`⚠️ ${name} est critique. Désactiver quand même ?`)) return;
                       const mcpServers = { ...agentContent.mcpServers };
@@ -303,7 +303,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                       {cfg.disabled ? '🔴' : '🟢'}
                     </button>
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-3 w-28">
                     {isInternet ? (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>
                     ) : (
@@ -329,7 +329,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                       </select>
                     )}
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-3 w-12">
                     {health[name] ? <span className={`w-2 h-2 inline-block rounded-full ${health[name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} /> : '—'}
                   </td>
                 </tr>
@@ -426,6 +426,19 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             </div>
           )}
           <DragDropContext onDragEnd={onDragEnd}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-600 text-slate-400 text-xs">
+                  <th className="py-2 px-1 w-8"></th>
+                  <th className="py-2 px-2 w-8"></th>
+                  <th className="text-left py-2 px-3">Serveur</th>
+                  <th className="text-left py-2 px-3 w-16">Priorité</th>
+                  <th className="text-left py-2 px-3 w-12">État</th>
+                  <th className="text-left py-2 px-3 w-28">Ressource</th>
+                  <th className="text-left py-2 px-3 w-12">Santé</th>
+                </tr>
+              </thead>
+            </table>
             {Object.entries(grouped).map(([category, servers]) => (
               <div key={category} className="border border-slate-600 rounded-lg overflow-hidden">
                 <button onClick={() => { const s = new Set(collapsedCats); s.has(category) ? s.delete(category) : s.add(category); setCollapsedCats(s); }}
