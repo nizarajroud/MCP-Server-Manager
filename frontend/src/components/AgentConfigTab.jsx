@@ -382,26 +382,31 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
         };
 
         return (
-        <div className="space-y-4">
-          <div className="flex gap-4 items-center flex-wrap">
-            <div className="flex gap-3 text-sm flex-wrap">
-              <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
-              <span onClick={() => { setFilterCritical(!filterCritical); setFilterType(null); if (!filterCritical) setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterCritical ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
-              <span onClick={() => { setFilterType(filterType === 'local' ? null : 'local'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'local' ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 Local: <strong>{totalDirect}</strong></span>
-              <span onClick={() => { setFilterType(filterType === 'lan' ? null : 'lan'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'lan' ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
-              <span onClick={() => { setFilterType(filterType === 'internet' ? null : 'internet'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'internet' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
-              <span onClick={() => { setFilterType(filterType === 'actifs' ? null : 'actifs'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'actifs' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
-              <span onClick={() => { setFilterType(filterType === 'heavy' ? null : 'heavy'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'heavy' ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.values(resources).filter(r => r.weight === 'heavy').length}</strong></span>
+        <div className="space-y-3">
+          {/* Zone 1 — Filtres rapides */}
+          <div className="flex gap-2 text-sm flex-wrap">
+            <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
+            <span onClick={() => { setFilterCritical(!filterCritical); setFilterType(null); if (!filterCritical) setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterCritical ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
+            <span onClick={() => { setFilterType(filterType === 'local' ? null : 'local'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'local' ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 Local: <strong>{totalDirect}</strong></span>
+            <span onClick={() => { setFilterType(filterType === 'lan' ? null : 'lan'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'lan' ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
+            <span onClick={() => { setFilterType(filterType === 'internet' ? null : 'internet'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'internet' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
+            <span onClick={() => { setFilterType(filterType === 'actifs' ? null : 'actifs'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'actifs' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
+            <span onClick={() => { setFilterType(filterType === 'heavy' ? null : 'heavy'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'heavy' ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.values(resources).filter(r => r.weight === 'heavy').length}</strong></span>
+          </div>
+
+          {/* Zone 2 — Recherche + Vue + Refresh */}
+          <div className="flex items-center justify-between gap-3">
+            <input type="text" placeholder="🔍 Rechercher un serveur..." value={deploySearch || ''} onChange={e => setDeploySearch(e.target.value)}
+              className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-72" />
+            <div className="flex items-center gap-2">
+              <button onClick={() => setCollapsedCats(new Set(Object.keys(grouped)))} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
+                <ChevronsUp size={14} /> Collapse
+              </button>
+              <button onClick={() => setCollapsedCats(new Set())} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
+                <ChevronsDown size={14} /> Expand
+              </button>
+              <button onClick={reloadHealth} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs active:scale-75 transition-transform" title="Rafraîchir santé">🔄 Santé</button>
             </div>
-            <input type="text" placeholder="Rechercher..." value={deploySearch || ''} onChange={e => setDeploySearch(e.target.value)}
-              className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-64" />
-            <button onClick={() => setCollapsedCats(new Set(Object.keys(grouped)))} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
-              <ChevronsUp size={14} /> Collapse All
-            </button>
-            <button onClick={() => setCollapsedCats(new Set())} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
-              <ChevronsDown size={14} /> Expand All
-            </button>
-            <button onClick={reloadHealth} className="text-slate-500 hover:text-white active:scale-75 transition-transform" title="Rafraîchir santé">🔄</button>
           </div>
           {deploySelected.size > 0 && (
             <div className="flex items-center gap-3 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600 flex-wrap">
