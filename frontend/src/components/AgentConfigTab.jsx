@@ -442,7 +442,12 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               <thead>
                 <tr className="border-b border-slate-600 text-slate-400 text-xs">
                   <th className="py-2 px-1 w-8"></th>
-                  <th className="py-2 px-2 w-8"></th>
+                  <th className="py-2 px-2 w-8">
+                    <input type="checkbox" onChange={(e) => {
+                      const all = Object.keys(agentContent.mcpServers || {});
+                      setDeploySelected(e.target.checked ? new Set(all) : new Set());
+                    }} checked={deploySelected.size > 0 && deploySelected.size === Object.keys(agentContent.mcpServers || {}).length} className="accent-purple-500" />
+                  </th>
                   <th className="text-left py-2 px-3">Serveur</th>
                   <th className="text-left py-2 px-3 w-16">Priorité</th>
                   <th className="text-left py-2 px-3 w-12">État</th>
