@@ -369,8 +369,8 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                       </select>
                     )}
                   </td>
-                  <td className="py-2 px-3 w-12" title={resources[name] ? `CPU: ${resources[name].cpu}% | MEM: ${resources[name].memMB}MB` : 'Non mesuré'}>
-                    {resources[name] ? (resources[name].weight === 'heavy' ? '🔥' : '🍃') : '—'}
+                  <td className="py-2 px-3 w-12" title={resources[name] ? `CPU: ${resources[name].cpu}% | MEM: ${resources[name].memMB}MB` : ''}>
+                    {(!isInternet && (!reg || reg.target === 'envy')) ? (resources[name] ? (resources[name].weight === 'heavy' ? '🔥' : '🍃') : '—') : '—'}
                   </td>
                   <td className="py-2 px-3 w-12">
                     {health[name] ? <span className={`w-2 h-2 inline-block rounded-full ${health[name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} /> : '—'}
