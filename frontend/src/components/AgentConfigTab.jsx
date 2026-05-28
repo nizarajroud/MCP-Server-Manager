@@ -16,6 +16,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
   const [batchLoading, setBatchLoading] = useState(false);
   const [collapsedCats, setCollapsedCats] = useState(new Set());
   const [filterCritical, setFilterCritical] = useState(false);
+  const [filterType, setFilterType] = useState(null);
   const [form, setForm] = useState({ name: '', description: '', welcomeMessage: '' });
   const [promptContent, setPromptContent] = useState('');
   const [promptFilePath, setPromptFilePath] = useState('');
@@ -236,6 +237,13 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
           const filtered = allServers.filter(n => {
             if (deploySearch && !n.toLowerCase().includes(deploySearch.toLowerCase())) return false;
             if (filterCritical && (agentContent.mcpServers[n].priority || 'standard') !== 'critical') return false;
+            const c = agentContent.mcpServers[n];
+            const isInet = c.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
+            const isLan = c.args?.includes('mcp-remote') && !isInet;
+            if (filterType === 'local' && (isInet || isLan)) return false;
+            if (filterType === 'lan' && !isLan) return false;
+            if (filterType === 'internet' && !isInet) return false;
+            if (filterType === 'actifs' && c.disabled) return false;
             return true;
           });
           for (const name of filtered) {
@@ -348,11 +356,11 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
           <div className="flex gap-4 items-center flex-wrap">
             <div className="flex gap-3 text-sm flex-wrap">
               <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
-              <span onClick={() => { setFilterCritical(!filterCritical); if (!filterCritical) setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterCritical ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
-              <span className="px-2 py-1 bg-slate-700 rounded">📦 Local: <strong>{totalDirect}</strong></span>
-              <span className="px-2 py-1 bg-purple-900/50 rounded text-purple-300">💻 LAN: <strong>{totalLAN}</strong></span>
-              <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">🌐 Internet: <strong>{totalInternet}</strong></span>
-              <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">✓ Actifs: <strong>{totalEnabled}</strong></span>
+              <span onClick={() => { setFilterCritical(!filterCritical); setFilterType(null); if (!filterCritical) setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterCritical ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
+              <span onClick={() => { setFilterType(filterType === 'local' ? null : 'local'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'local' ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 Local: <strong>{totalDirect}</strong></span>
+              <span onClick={() => { setFilterType(filterType === 'lan' ? null : 'lan'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'lan' ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
+              <span onClick={() => { setFilterType(filterType === 'internet' ? null : 'internet'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'internet' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
+              <span onClick={() => { setFilterType(filterType === 'actifs' ? null : 'actifs'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'actifs' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
             </div>
             <input type="text" placeholder="Rechercher..." value={deploySearch || ''} onChange={e => setDeploySearch(e.target.value)}
               className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-64" />
