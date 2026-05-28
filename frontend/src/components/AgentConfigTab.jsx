@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Upload, RotateCcw } from 'lucide-react';
+import { Save } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { json } from '@codemirror/lang-json';
@@ -7,10 +7,12 @@ import { oneDark } from '@codemirror/theme-one-dark';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, registry, health, saveToGitHub, showNotification, reloadAgent, api }) => {
+const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, registry, health, saveToGitHub, showNotification, reloadAgent, reloadRegistry, setRegistry, reloadHealth, api }) => {
   const [subTab, setSubTab] = useState('general');
   const [deploySort, setDeploySort] = useState({ key: null, asc: true });
   const [deploySearch, setDeploySearch] = useState('');
+  const [deploySelected, setDeploySelected] = useState(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
   const [form, setForm] = useState({ name: '', description: '', welcomeMessage: '' });
   const [promptContent, setPromptContent] = useState('');
   const [promptFilePath, setPromptFilePath] = useState('');
@@ -213,16 +215,18 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
 
       {subTab === 'deploy' && (() => {
         const allServers = Object.keys(agentContent.mcpServers || {});
-        const totalDirect = allServers.filter(n => { const c = agentContent.mcpServers[n]; return !(c.args && c.args.includes('mcp-remote')); }).length;
-        const totalRemote = allServers.length - totalDirect;
+        const totalInternet = allServers.filter(n => { const c = agentContent.mcpServers[n]; return c.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); }).length;
+        const totalLAN = allServers.filter(n => { const c = agentContent.mcpServers[n]; return c.args?.includes('mcp-remote') && !c.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); }).length;
+        const totalDirect = allServers.length - totalInternet - totalLAN;
         const totalEnabled = allServers.filter(n => !agentContent.mcpServers[n].disabled).length;
         return (
         <div className="space-y-4">
           <div className="flex gap-4 items-center flex-wrap">
             <div className="flex gap-3 text-sm">
               <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
-              <span className="px-2 py-1 bg-slate-700 rounded">📦 Direct: <strong>{totalDirect}</strong></span>
-              <span className="px-2 py-1 bg-blue-900/50 rounded text-blue-300">🌐 Remote: <strong>{totalRemote}</strong></span>
+              <span className="px-2 py-1 bg-slate-700 rounded">📦 Local: <strong>{totalDirect}</strong></span>
+              <span className="px-2 py-1 bg-purple-900/50 rounded text-purple-300">💻 LAN: <strong>{totalLAN}</strong></span>
+              <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">🌐 Internet: <strong>{totalInternet}</strong></span>
               <span className="px-2 py-1 bg-green-900/50 rounded text-green-300">✓ Actifs: <strong>{totalEnabled}</strong></span>
             </div>
             <input
@@ -233,45 +237,117 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-64"
             />
           </div>
+          {deploySelected.size > 0 && (
+            <div className="flex items-center gap-3 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600 flex-wrap">
+              <span className="text-sm text-slate-300">☑ {deploySelected.size} sélectionné{deploySelected.size > 1 ? 's' : ''}</span>
+              <button disabled={batchLoading} onClick={async () => {
+                setBatchLoading(true);
+                const mcpServers = { ...agentContent.mcpServers };
+                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], disabled: false };
+                await saveToGitHub(mcpServers, `feat: enable ${deploySelected.size} servers`);
+                setDeploySelected(new Set()); setBatchLoading(false);
+              }} className="px-3 py-1 bg-green-600 hover:bg-green-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🟢 Activer</button>
+              <button disabled={batchLoading} onClick={async () => {
+                setBatchLoading(true);
+                const mcpServers = { ...agentContent.mcpServers };
+                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], disabled: true };
+                await saveToGitHub(mcpServers, `feat: disable ${deploySelected.size} servers`);
+                setDeploySelected(new Set()); setBatchLoading(false);
+              }} className="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🔴 Désactiver</button>
+              <button disabled={batchLoading} onClick={async () => {
+                setBatchLoading(true);
+                try {
+                  // Exclude Internet servers from batch
+                  const eligible = [...deploySelected].filter(n => {
+                    const c = agentContent.mcpServers[n];
+                    return !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
+                  });
+                  if (!eligible.length) { showNotification('Aucun serveur éligible (Internet exclus)', 'error'); setBatchLoading(false); return; }
+                  const updates = eligible.map(n => ({ serverName: n, target: 'pcalt' }));
+                  const result = await api.batchUpdateTargets(updates, selectedBranch);
+                  setRegistry(result.registry);
+                  const mcpServers = { ...agentContent.mcpServers };
+                  for (const n of eligible) {
+                    const r = result.registry[n];
+                    if (r && r.port) {
+                      const cfg = mcpServers[n];
+                      mcpServers[n] = { ...cfg, _original: cfg._original || { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false };
+                    }
+                  }
+                  await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to pcalt`);
+                  await reloadHealth();
+                  setDeploySelected(new Set());
+                } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
+                setBatchLoading(false);
+              }} className="px-3 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">💻 → pcalt</button>
+              <button disabled={batchLoading} onClick={async () => {
+                setBatchLoading(true);
+                try {
+                  const updates = [...deploySelected].map(n => ({ serverName: n, target: 'envy' }));
+                  const result = await api.batchUpdateTargets(updates, selectedBranch);
+                  setRegistry(result.registry);
+                  const mcpServers = { ...agentContent.mcpServers };
+                  for (const n of deploySelected) {
+                    const cfg = mcpServers[n];
+                    if (cfg._original) {
+                      mcpServers[n] = { ...cfg, command: cfg._original.command, args: cfg._original.args, disabled: false };
+                      delete mcpServers[n]._original;
+                    } else {
+                      mcpServers[n] = { ...cfg, disabled: false };
+                    }
+                  }
+                  await saveToGitHub(mcpServers, `feat: move ${deploySelected.size} servers to local`);
+                  await reloadHealth();
+                  setDeploySelected(new Set());
+                } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
+                setBatchLoading(false);
+              }} className="px-3 py-1 bg-slate-600 hover:bg-slate-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">📦 → Local</button>
+              {batchLoading && <span className="text-xs text-purple-300 animate-pulse">⏳ En cours...</span>}
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700 text-slate-500 text-xs uppercase">
-                  <th className="text-left py-1 px-3" rowSpan="2"></th>
-                  <th className="text-center py-1 px-3 border-l border-slate-700" colSpan="2">Client</th>
-                  <th className="text-center py-1 px-3 border-l border-slate-700" colSpan="3">Serveur</th>
-                </tr>
                 <tr className="border-b border-slate-600 text-slate-400">
-                  <th className="text-left py-2 px-3 border-l border-slate-700 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
-                  <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'acces', asc: s.key === 'acces' ? !s.asc : true }))}>Accès {deploySort.key === 'acces' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
-                  <th className="text-left py-2 px-3 border-l border-slate-700 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
-                  <th className="text-left py-2 px-3">Port</th>
-                  <th className="text-left py-2 px-3">Santé</th>
+                  <th className="py-2 px-2">
+                    <input type="checkbox" onChange={(e) => {
+                      const all = Object.keys(agentContent.mcpServers || {});
+                      setDeploySelected(e.target.checked ? new Set(all) : new Set());
+                    }} checked={deploySelected.size > 0 && deploySelected.size === Object.keys(agentContent.mcpServers || {}).length} className="accent-purple-500" />
+                  </th>
+                  <th className="text-left py-2 px-3">Serveur</th>
+                  <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
+                  <th className="text-left py-2 px-3 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
+                  <th className="text-left py-2 px-3">Santé <button onClick={reloadHealth} className="text-slate-500 hover:text-white ml-1 active:scale-75 transition-transform" title="Rafraîchir">🔄</button></th>
                 </tr>
               </thead>
               <tbody>
                 {Object.keys(agentContent.mcpServers || {}).filter(name => !deploySearch || name.toLowerCase().includes(deploySearch.toLowerCase())).map(name => {
                   const reg = registry[name];
                   const cfg = agentContent.mcpServers[name];
-                  const isRemote = cfg.args && cfg.args.includes('mcp-remote');
                   const isInternet = cfg?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
-                  return { name, reg, cfg, isRemote, isInternet, disabled: !!cfg.disabled, ressource: isInternet ? 'internet' : (reg && reg.target !== 'envy') ? reg.target : '' };
+                  return { name, reg, cfg, isInternet, disabled: !!cfg.disabled, ressource: isInternet ? 'internet' : (reg && reg.target !== 'envy') ? reg.target : '' };
                 }).sort((a, b) => {
                   if (!deploySort.key) return 0;
                   let va, vb;
                   switch (deploySort.key) {
                     case 'etat': va = a.disabled ? 1 : 0; vb = b.disabled ? 1 : 0; break;
-                    case 'acces': va = a.isRemote ? 1 : 0; vb = b.isRemote ? 1 : 0; break;
                     case 'ressource': va = a.ressource; vb = b.ressource; break;
                     default: return 0;
                   }
                   if (va < vb) return deploySort.asc ? -1 : 1;
                   if (va > vb) return deploySort.asc ? 1 : -1;
                   return 0;
-                }).map(({ name, reg, cfg, isRemote, isInternet }) => {
-                  const clientAligned = (isInternet) || (isRemote && reg && reg.target !== 'envy') || (!isRemote && (!reg || reg.target === 'envy'));
+                }).map(({ name, reg, cfg, isInternet }) => {
                   return (
-                    <tr key={name} className={`border-b border-slate-700/50 hover:bg-slate-700/30 ${!clientAligned ? 'bg-yellow-900/10' : ''}`}>
+                    <tr key={name} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                      <td className="py-2 px-2">
+                        <input type="checkbox" checked={deploySelected.has(name)} onChange={() => {
+                          const s = new Set(deploySelected);
+                          s.has(name) ? s.delete(name) : s.add(name);
+                          setDeploySelected(s);
+                        }} className="accent-purple-500" />
+                      </td>
                       <td className="py-2 px-3 font-medium">{name}</td>
                       <td className="py-2 px-3 border-l border-slate-700">
                         <button onClick={async () => {
@@ -281,25 +357,55 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                           try {
                             await saveToGitHub(mcpServers, `feat: ${action} ${name}`);
                           } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
-                        }} className={`transition ${cfg.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
+                        }} className={`transition active:scale-75 ${cfg.disabled ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`}>
                           {cfg.disabled ? '🔴' : '🟢'}
                         </button>
                       </td>
                       <td className="py-2 px-3">
-                        <span className={`text-xs px-1.5 py-0.5 rounded ${isRemote ? 'bg-blue-900/50 text-blue-300' : 'bg-slate-600 text-slate-300'}`}>
-                          {isRemote ? '🌐 mcp-remote' : '📦 direct'}
-                        </span>
+                        {isInternet ? (
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>
+                        ) : (
+                          <select value={reg?.target === 'envy' || !reg ? 'local' : reg.target} onChange={async (e) => {
+                            try {
+                              const target = e.target.value === 'local' ? 'envy' : e.target.value;
+                              // 1. Update servers.yaml
+                              const result = await api.updateServerTarget(name, target, selectedBranch);
+                              // 2. Update agent JSON (client config)
+                              const mcpServers = { ...agentContent.mcpServers };
+                              const serverCfg = mcpServers[name];
+                              if (target === 'envy') {
+                                // Restore local: use _original if available
+                                if (serverCfg._original) {
+                                  mcpServers[name] = { ...serverCfg, command: serverCfg._original.command, args: serverCfg._original.args, disabled: false };
+                                  delete mcpServers[name]._original;
+                                } else {
+                                  mcpServers[name] = { ...serverCfg, disabled: false };
+                                }
+                              } else {
+                                // Switch to remote: store original + set mcp-remote
+                                const port = result.port;
+                                if (port && !(serverCfg.args && serverCfg.args.includes('mcp-remote'))) {
+                                  mcpServers[name] = {
+                                    ...serverCfg,
+                                    _original: { command: serverCfg.command, args: serverCfg.args },
+                                    command: 'npx',
+                                    args: ['mcp-remote', `http://192.168.2.56:${port}/mcp`, '--allow-http'],
+                                    disabled: false
+                                  };
+                                } else {
+                                  mcpServers[name] = { ...serverCfg, disabled: false };
+                                }
+                              }
+                              await saveToGitHub(mcpServers, `feat: ${target === 'envy' ? 'restore local' : 'switch to remote'} ${name}`);
+                              reloadRegistry();
+                              reloadHealth();
+                            } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
+                          }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">
+                            <option value="local">📦 Local</option>
+                            <option value="pcalt">💻 pcalt</option>
+                          </select>
+                        )}
                       </td>
-                      <td className="py-2 px-3 border-l border-slate-700">
-                        {(() => {
-                          if (!isRemote) return <span className="text-slate-500">—</span>;
-                          const isInternet = cfg?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
-                          if (isInternet) return <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>;
-                          if (reg && reg.target !== 'envy') return <span className="text-xs px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">💻 {reg.target}</span>;
-                          return <span className="text-slate-500">—</span>;
-                        })()}
-                      </td>
-                      <td className="py-2 px-3 text-slate-400">{reg?.port || '—'}</td>
                       <td className="py-2 px-3">
                         {health[name] ? (
                           <span className={`w-2 h-2 inline-block rounded-full ${health[name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} />
@@ -310,26 +416,6 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 })}
               </tbody>
             </table>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button onClick={async () => {
-              try {
-                const result = await api.applyRemoteConfig(selectedAgent, selectedBranch);
-                showNotification(`Config remote appliquée (${result.changed} serveurs) ✓`);
-                reloadAgent();
-              } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
-            }} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition flex items-center gap-2">
-              <Upload size={18} /> Aligner client → serveur
-            </button>
-            <button onClick={async () => {
-              try {
-                const result = await api.restoreLocalConfig(selectedAgent, selectedBranch);
-                showNotification(`Config locale restaurée (${result.changed} serveurs) ✓`);
-                reloadAgent();
-              } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
-            }} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition flex items-center gap-2">
-              <RotateCcw size={18} /> Restaurer config locale
-            </button>
           </div>
         </div>
         );
