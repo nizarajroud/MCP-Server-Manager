@@ -392,7 +392,7 @@ app.get('/api/servers-registry', async (req, res) => {
       registry[name] = {
         target: cfg.target,
         host: machine.host || 'localhost',
-        port: machine.base_port ? machine.base_port + (cfg.port_offset || 0) : null
+        port: cfg.port || (machine.base_port ? machine.base_port + (cfg.port_offset || 0) : null)
       };
     }
     res.json(registry);
@@ -516,7 +516,7 @@ app.post('/api/servers-registry/batch', async (req, res) => {
     const registry = {};
     for (const [name, cfg] of Object.entries(parsed.servers)) {
       const machine = machines[cfg.target] || {};
-      registry[name] = { target: cfg.target, host: machine.host || 'localhost', port: machine.base_port ? machine.base_port + (cfg.port_offset || 0) : null };
+      registry[name] = { target: cfg.target, host: machine.host || 'localhost', port: cfg.port || (machine.base_port ? machine.base_port + (cfg.port_offset || 0) : null) };
     }
     res.json({ success: true, changed: updates.length, registry });
   } catch (e) {
