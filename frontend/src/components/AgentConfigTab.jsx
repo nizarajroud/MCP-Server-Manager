@@ -524,7 +524,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                       setDeploySelected(e.target.checked ? new Set(visible) : new Set());
                     }} checked={deploySelected.size > 0 && deploySelected.size === Object.values(grouped).flat().length} className="accent-purple-500" />
                   </th>
-                  <th className="text-left py-2 px-3">Serveur</th>
+                  <th className="text-left py-2 px-3">Serveur ({Object.values(grouped).flat().length})</th>
                   <th className="text-left py-2 px-3 w-16 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'priority', asc: s.key === 'priority' ? !s.asc : true }))}>Priorité {deploySort.key === 'priority' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3 w-12 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'etat', asc: s.key === 'etat' ? !s.asc : true }))}>État {deploySort.key === 'etat' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
                   <th className="text-left py-2 px-3 w-28 cursor-pointer hover:text-white" onClick={() => setDeploySort(s => ({ key: 'ressource', asc: s.key === 'ressource' ? !s.asc : true }))}>Ressource {deploySort.key === 'ressource' ? (deploySort.asc ? '▲' : '▼') : ''}</th>
