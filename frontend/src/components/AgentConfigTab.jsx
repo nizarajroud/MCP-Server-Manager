@@ -402,8 +402,11 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
 
           {/* Zone 2 — Recherche + Vue + Refresh */}
           <div className="flex items-center justify-between gap-3">
-            <input type="text" placeholder="🔍 Rechercher un serveur..." value={deploySearch || ''} onChange={e => setDeploySearch(e.target.value)}
-              className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-72" />
+            <div className="relative">
+              <input type="text" placeholder="🔍 Rechercher un serveur..." value={deploySearch || ''} onChange={e => setDeploySearch(e.target.value)}
+                className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-72 pr-8" />
+              {deploySearch && <button onClick={() => setDeploySearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-lg leading-none">✕</button>}
+            </div>
             <div className="flex items-center gap-2">
               <button onClick={() => {
                 const allCats = Object.keys(grouped);
