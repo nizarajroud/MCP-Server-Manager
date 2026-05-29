@@ -562,10 +562,10 @@ app.get('/api/resources', async (req, res) => {
         results[matched].memMB += Math.round(memKB / 1024);
       }
     }
-    // Classify: heavy if > 200MB memory
+    // Classify: heavy if > 300MB memory
     const classified = {};
     for (const [name, data] of Object.entries(results)) {
-      classified[name] = { ...data, weight: data.memMB > 200 ? 'heavy' : 'light' };
+      classified[name] = { ...data, weight: data.memMB > 300 ? 'heavy' : 'light' };
     }
     res.json(classified);
   } catch (e) {
