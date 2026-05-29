@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Database, Download, GitBranch, RefreshCw } from 'lucide-react';
 import { api } from '../lib/api';
+import DeployTab from './DeployTab';
 import HomeTab from './HomeTab';
 import AgentConfigTab from './AgentConfigTab';
 import ServerConfigTab from './ServerConfigTab';
@@ -20,7 +21,7 @@ const MCPManager = () => {
   const [localBranch, setLocalBranch] = useState('');
   const [defaultAgent, setDefaultAgent] = useState('');
   const [categories, setCategories] = useState({});
-  const [mainTab, setMainTab] = useState('home');
+  const [mainTab, setMainTab] = useState('deploy');
   const [version, setVersion] = useState('');
   const [registry, setRegistry] = useState({});
   const [health, setHealth] = useState({});
@@ -149,7 +150,7 @@ const MCPManager = () => {
   };
 
   const mainTabs = [
-    { id: 'home', label: 'Home' },
+    { id: 'deploy', label: 'Déploiement' },
     { id: 'agents', label: 'Configuration des agents' },
     { id: 'servers', label: 'Configuration serveur MCP' },
     { id: 'settings', label: 'Paramètres' },
@@ -211,21 +212,21 @@ const MCPManager = () => {
         <div className="bg-slate-800/50 backdrop-blur rounded-lg p-6 border border-slate-700">
           {loading && <p className="text-slate-400">Chargement...</p>}
 
-          {!loading && mainTab === 'home' && selectedAgent && (
-            <HomeTab
-              servers={servers}
-              categories={categories}
-              setCategories={setCategories}
-              registry={registry}
-              health={health}
+          {!loading && mainTab === 'deploy' && selectedAgent && (
+            <DeployTab
               agentContent={agentContent}
               selectedAgent={selectedAgent}
               selectedBranch={selectedBranch}
-              agents={agents}
+              categories={categories}
+              setCategories={setCategories}
+              registry={registry}
+              setRegistry={setRegistry}
+              health={health}
+              resources={resources}
               saveToGitHub={saveToGitHub}
-              setServers={setServers}
               showNotification={showNotification}
-              reloadAgent={loadAgent}
+              reloadRegistry={loadRegistry}
+              reloadHealth={loadHealth}
             />
           )}
 
@@ -236,17 +237,9 @@ const MCPManager = () => {
               agentContent={agentContent}
               agentSha={agentSha}
               selectedBranch={selectedBranch}
-              categories={categories}
-              setCategories={setCategories}
-              registry={registry}
-              health={health}
-              resources={resources}
               saveToGitHub={saveToGitHub}
               showNotification={showNotification}
               reloadAgent={loadAgent}
-              reloadRegistry={loadRegistry}
-              setRegistry={setRegistry}
-              reloadHealth={loadHealth}
               api={api}
             />
           )}
