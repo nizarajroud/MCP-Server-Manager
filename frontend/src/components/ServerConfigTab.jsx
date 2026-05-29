@@ -198,7 +198,7 @@ const ServerConfigTab = ({ servers, agentContent, selectedAgent, agentSha, selec
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-slate-900 p-4 rounded-lg border border-slate-600">
                     <p className="text-sm text-slate-400 mb-1">Machine cible</p>
-                    <p className="text-lg">{reg ? (reg.target === 'envy' ? '🏠 Local (envy)' : `💻 ${reg.target}`) : '❓ Non assigné'}</p>
+                    <p className="text-lg">{reg ? (reg.target === 'local' ? '🏠 Local' : `💻 ${reg.target}`) : '❓ Non assigné'}</p>
                   </div>
                   <div className="bg-slate-900 p-4 rounded-lg border border-slate-600">
                     <p className="text-sm text-slate-400 mb-1">Port</p>

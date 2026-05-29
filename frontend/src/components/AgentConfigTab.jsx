@@ -10,13 +10,12 @@ const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selectedBranch, categories, setCategories, registry, health, resources, saveToGitHub, showNotification, reloadAgent, reloadRegistry, setRegistry, reloadHealth, api }) => {
   const [subTab, setSubTab] = useState('general');
-  const [deploySort, setDeploySort] = useState({ key: null, asc: true });
+  const [deploySort, setDeploySort] = useState({ key: 'cl', asc: false });
   const [deploySearch, setDeploySearch] = useState('');
   const [deploySelected, setDeploySelected] = useState(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
   const [collapsedCats, setCollapsedCats] = useState(new Set());
-  const [filterCritical, setFilterCritical] = useState(false);
-  const [filterType, setFilterType] = useState(null);
+  const [activeFilters, setActiveFilters] = useState(new Set());
   const [form, setForm] = useState({ name: '', description: '', welcomeMessage: '' });
   const [promptContent, setPromptContent] = useState('');
   const [promptFilePath, setPromptFilePath] = useState('');
@@ -236,15 +235,22 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
           const grouped = {};
           const filtered = allServers.filter(n => {
             if (deploySearch && !n.toLowerCase().includes(deploySearch.toLowerCase())) return false;
-            if (filterCritical && (agentContent.mcpServers[n].priority || 'standard') !== 'critical') return false;
             const c = agentContent.mcpServers[n];
             const isInet = c.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
             const isLan = c.args?.includes('mcp-remote') && !isInet;
-            if (filterType === 'local' && (isInet || isLan)) return false;
-            if (filterType === 'lan' && !isLan) return false;
-            if (filterType === 'internet' && !isInet) return false;
-            if (filterType === 'actifs' && c.disabled) return false;
-            if (filterType === 'heavy' && (!resources[n] || resources[n].weight !== 'heavy')) return false;
+            // Priority filter (intersection)
+            if (activeFilters.has('critical') && (c.priority || 'standard') !== 'critical') return false;
+            // State filter (intersection)
+            if (activeFilters.has('actifs') && c.disabled) return false;
+            if (activeFilters.has('heavy') && (!resources[n] || resources[n].weight !== 'heavy' || (registry[n] && registry[n].target !== 'local'))) return false;
+            // Resource filters (union within group)
+            const resourceFilters = ['local', 'lan', 'internet'].filter(f => activeFilters.has(f));
+            if (resourceFilters.length > 0) {
+              const matchesLocal = resourceFilters.includes('local') && !isInet && !isLan;
+              const matchesLan = resourceFilters.includes('lan') && isLan;
+              const matchesInternet = resourceFilters.includes('internet') && isInet;
+              if (!matchesLocal && !matchesLan && !matchesInternet) return false;
+            }
             return true;
           });
           for (const name of filtered) {
@@ -253,7 +259,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             grouped[cat].push(name);
           }
           // Sort within categories
-          if (filterType === 'heavy') {
+          if (activeFilters.has('heavy')) {
             for (const cat of Object.keys(grouped)) {
               grouped[cat].sort((a, b) => ((resources[b]?.memMB || 0) - (resources[a]?.memMB || 0)));
             }
@@ -265,7 +271,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
               switch (deploySort.key) {
                 case 'priority': return (c.priority || 'standard') === 'critical' ? 0 : 1;
                 case 'etat': return c.disabled ? 1 : 0;
-                case 'ressource': return isInet ? 'internet' : (r && r.target !== 'envy') ? r.target : 'local';
+                case 'ressource': return isInet ? 'internet' : (r && r.target !== 'local') ? r.target : 'local';
                 case 'cl': return resources[n]?.memMB || 0;
                 default: return 0;
               }
@@ -347,20 +353,20 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                     {isInternet ? (
                       <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>
                     ) : (
-                      <select value={reg?.target === 'envy' || !reg ? 'local' : reg.target} onChange={async (e) => {
+                      <select value={reg?.target === 'local' || !reg ? 'local' : reg.target} onChange={async (e) => {
                         try {
-                          const target = e.target.value === 'local' ? 'envy' : e.target.value;
+                          const target = e.target.value;
                           const result = await api.updateServerTarget(name, target, selectedBranch);
                           const mcpServers = { ...agentContent.mcpServers };
                           const serverCfg = mcpServers[name];
-                          if (target === 'envy') {
+                          if (target === 'local') {
                             if (serverCfg._original) { mcpServers[name] = { ...serverCfg, command: serverCfg._original.command, args: serverCfg._original.args, disabled: false }; delete mcpServers[name]._original; }
                             else { mcpServers[name] = { ...serverCfg, disabled: false }; }
                           } else {
                             const port = result.port;
                             if (port) { mcpServers[name] = { ...serverCfg, _original: serverCfg._original || { command: serverCfg.command, args: serverCfg.args }, command: 'npx', args: ['mcp-remote', `http://192.168.2.56:${port}/mcp`, '--allow-http'], disabled: false }; }
                           }
-                          await saveToGitHub(mcpServers, `feat: ${target === 'envy' ? 'restore local' : 'switch to remote'} ${name}`);
+                          await saveToGitHub(mcpServers, `feat: ${target === 'local' ? 'restore local' : 'switch to remote'} ${name}`);
                           reloadRegistry(); reloadHealth();
                         } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
                       }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">
@@ -370,7 +376,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                     )}
                   </td>
                   <td className="py-2 px-3 w-12" title={resources[name] ? `CPU: ${resources[name].cpu}% | MEM: ${resources[name].memMB}MB` : ''}>
-                    {(!isInternet && (!reg || reg.target === 'envy')) ? (resources[name] ? (resources[name].weight === 'heavy' ? '🔥' : '🍃') : '—') : '—'}
+                    {(!isInternet && (!reg || reg.target === 'local')) ? (resources[name] ? (resources[name].weight === 'heavy' ? '🔥' : '🍃') : '—') : '—'}
                   </td>
                   <td className="py-2 px-3 w-12">
                     {health[name] ? <span className={`w-2 h-2 inline-block rounded-full ${health[name] === 'up' ? 'bg-green-400' : 'bg-red-400'}`} /> : '—'}
@@ -382,26 +388,34 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
         };
 
         return (
-        <div className="space-y-4">
-          <div className="flex gap-4 items-center flex-wrap">
-            <div className="flex gap-3 text-sm flex-wrap">
-              <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
-              <span onClick={() => { setFilterCritical(!filterCritical); setFilterType(null); if (!filterCritical) setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterCritical ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
-              <span onClick={() => { setFilterType(filterType === 'local' ? null : 'local'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'local' ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 Local: <strong>{totalDirect}</strong></span>
-              <span onClick={() => { setFilterType(filterType === 'lan' ? null : 'lan'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'lan' ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
-              <span onClick={() => { setFilterType(filterType === 'internet' ? null : 'internet'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'internet' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
-              <span onClick={() => { setFilterType(filterType === 'actifs' ? null : 'actifs'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'actifs' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
-              <span onClick={() => { setFilterType(filterType === 'heavy' ? null : 'heavy'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'heavy' ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.values(resources).filter(r => r.weight === 'heavy').length}</strong></span>
+        <div className="space-y-3">
+          {/* Zone 1 — Filtres rapides */}
+          <div className="flex gap-2 text-sm flex-wrap">
+            <span onClick={() => { setActiveFilters(new Set()); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.size === 0 ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>Total: <strong>{allServers.length}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('critical') ? s.delete('critical') : s.add('critical'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('critical') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('local') ? s.delete('local') : s.add('local'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('local') ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 Local: <strong>{totalDirect}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('lan') ? s.delete('lan') : s.add('lan'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('lan') ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('internet') ? s.delete('internet') : s.add('internet'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('internet') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('actifs') ? s.delete('actifs') : s.add('actifs'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('actifs') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('heavy') ? s.delete('heavy') : s.add('heavy'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('heavy') ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.entries(resources).filter(([n, r]) => r.weight === 'heavy' && (!registry[n] || registry[n].target === 'local')).length}</strong></span>
+          </div>
+
+          {/* Zone 2 — Recherche + Vue + Refresh */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="relative">
+              <input type="text" placeholder="🔍 Rechercher un serveur..." value={deploySearch || ''} onChange={e => setDeploySearch(e.target.value)}
+                className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-72 pr-8" />
+              {deploySearch && <button onClick={() => setDeploySearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-lg leading-none">✕</button>}
             </div>
-            <input type="text" placeholder="Rechercher..." value={deploySearch || ''} onChange={e => setDeploySearch(e.target.value)}
-              className="px-3 py-1.5 bg-slate-900 border border-slate-600 rounded-lg text-sm focus:border-purple-500 focus:outline-none w-64" />
-            <button onClick={() => setCollapsedCats(new Set(Object.keys(grouped)))} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
-              <ChevronsUp size={14} /> Collapse All
-            </button>
-            <button onClick={() => setCollapsedCats(new Set())} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
-              <ChevronsDown size={14} /> Expand All
-            </button>
-            <button onClick={reloadHealth} className="text-slate-500 hover:text-white active:scale-75 transition-transform" title="Rafraîchir santé">🔄</button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => {
+                const allCats = Object.keys(grouped);
+                setCollapsedCats(collapsedCats.size === allCats.length ? new Set() : new Set(allCats));
+              }} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs flex items-center gap-1">
+                {collapsedCats.size === Object.keys(grouped).length ? <><ChevronsDown size={14} /> Expand</> : <><ChevronsUp size={14} /> Collapse</>}
+              </button>
+              <button onClick={reloadHealth} className="px-3 py-1 bg-slate-700 hover:bg-slate-600 rounded text-xs active:scale-75 transition-transform" title="Rafraîchir santé">🔄 Santé</button>
+            </div>
           </div>
           {deploySelected.size > 0 && (
             <div className="flex items-center gap-3 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600 flex-wrap">
@@ -412,7 +426,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], disabled: false };
                 await saveToGitHub(mcpServers, `feat: enable ${deploySelected.size} servers`);
                 setDeploySelected(new Set()); setBatchLoading(false);
-              }} className="px-3 py-1 bg-green-600 hover:bg-green-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🟢 Activer</button>
+              }} className="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/40 border border-green-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🟢 Activer</button>
               <button disabled={batchLoading} onClick={async () => {
                 setBatchLoading(true);
                 const mcpServers = { ...agentContent.mcpServers };
@@ -421,7 +435,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 for (const n of eligible) mcpServers[n] = { ...mcpServers[n], disabled: true };
                 await saveToGitHub(mcpServers, `feat: disable ${eligible.length} servers`);
                 setDeploySelected(new Set()); setBatchLoading(false);
-              }} className="px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🔴 Désactiver</button>
+              }} className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🔴 Désactiver</button>
               <button disabled={batchLoading} onClick={async () => {
                 setBatchLoading(true);
                 try {
@@ -436,13 +450,13 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   await reloadHealth(); setDeploySelected(new Set());
                 } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
                 setBatchLoading(false);
-              }} className="px-3 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">💻 → pcalt</button>
+              }} className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">💻 → pcalt</button>
               <button disabled={batchLoading} onClick={async () => {
                 setBatchLoading(true);
                 try {
                   const eligible = [...deploySelected].filter(n => (agentContent.mcpServers[n]?.priority || 'standard') !== 'critical');
                   if (!eligible.length) { showNotification('Critiques exclus', 'error'); setBatchLoading(false); return; }
-                  const updates = eligible.map(n => ({ serverName: n, target: 'envy' }));
+                  const updates = eligible.map(n => ({ serverName: n, target: 'local' }));
                   const result = await api.batchUpdateTargets(updates, selectedBranch);
                   setRegistry(result.registry);
                   const mcpServers = { ...agentContent.mcpServers };
@@ -451,24 +465,48 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   await reloadHealth(); setDeploySelected(new Set());
                 } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
                 setBatchLoading(false);
-              }} className="px-3 py-1 bg-slate-600 hover:bg-slate-500 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">📦 → Local</button>
+              }} className="px-3 py-1.5 bg-slate-600/20 hover:bg-slate-600/40 border border-slate-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">📦 → Local</button>
               <button disabled={batchLoading} onClick={async () => {
                 setBatchLoading(true);
                 const mcpServers = { ...agentContent.mcpServers };
                 for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], priority: 'critical' };
                 await saveToGitHub(mcpServers, `feat: set ${deploySelected.size} servers as critical`);
                 setDeploySelected(new Set()); setBatchLoading(false);
-              }} className="px-3 py-1 bg-red-900 hover:bg-red-800 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🔴 Critique</button>
+              }} className="px-3 py-1.5 bg-red-900/20 hover:bg-red-900/40 border border-red-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🔴 Critique</button>
               <button disabled={batchLoading} onClick={async () => {
                 setBatchLoading(true);
                 const mcpServers = { ...agentContent.mcpServers };
                 for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], priority: 'standard' };
                 await saveToGitHub(mcpServers, `feat: set ${deploySelected.size} servers as normal`);
                 setDeploySelected(new Set()); setBatchLoading(false);
-              }} className="px-3 py-1 bg-yellow-900 hover:bg-yellow-800 rounded text-xs active:scale-90 transition-transform disabled:opacity-50">🟡 Normal</button>
+              }} className="px-3 py-1.5 bg-yellow-900/20 hover:bg-yellow-900/40 border border-yellow-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🟡 Normal</button>
               {batchLoading && <span className="text-xs text-purple-300 animate-pulse">⏳ En cours...</span>}
             </div>
           )}
+          {(() => {
+            const pcaltServers = allServers.filter(n => registry[n]?.target === 'pcalt' || (agentContent.mcpServers[n]?.args?.includes('mcp-remote') && !agentContent.mcpServers[n]?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')))));
+            const pcaltClientsActive = pcaltServers.filter(n => !agentContent.mcpServers[n].disabled).length;
+            const pcaltServersUp = pcaltServers.filter(n => health[n] === 'up').length;
+            const pcaltIdle = pcaltServersUp - pcaltClientsActive;
+            const localServers = allServers.filter(n => !registry[n] || registry[n].target === 'local');
+            const localActive = localServers.filter(n => !agentContent.mcpServers[n].disabled).length;
+            const localMemMB = localServers.reduce((sum, n) => sum + (resources[n]?.memMB || 0), 0);
+            return (
+              <div className="flex gap-4 text-xs flex-wrap mb-3">
+                <div className="px-3 py-2 bg-purple-900/20 border border-purple-800/50 rounded-lg flex gap-3 items-center">
+                  <span className="font-semibold text-purple-300">💻 pcalt</span>
+                  <span>Clients actifs: <strong>{pcaltClientsActive}/{pcaltServers.length}</strong></span>
+                  <span>Serveurs UP: <strong>{pcaltServersUp}/{pcaltServers.length}</strong></span>
+                  {pcaltIdle > 0 && <span className="text-yellow-400">⚠️ {pcaltIdle} sans client</span>}
+                </div>
+                <div className="px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg flex gap-3 items-center">
+                  <span className="font-semibold text-slate-300">📦 Local</span>
+                  <span>Actifs: <strong>{localActive}/{localServers.length}</strong></span>
+                  <span>Conso: <strong>{localMemMB > 1024 ? `${(localMemMB/1024).toFixed(1)} GB` : `${localMemMB} MB`}</strong></span>
+                </div>
+              </div>
+            );
+          })()}
           <DragDropContext onDragEnd={onDragEnd}>
             <table className="w-full text-sm">
               <thead>

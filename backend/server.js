@@ -392,7 +392,7 @@ app.get('/api/servers-registry', async (req, res) => {
       registry[name] = {
         target: cfg.target,
         host: machine.host || 'localhost',
-        port: machine.base_port ? machine.base_port + (cfg.port_offset || 0) : null
+        port: cfg.port || (machine.base_port ? machine.base_port + (cfg.port_offset || 0) : null)
       };
     }
     res.json(registry);
@@ -423,7 +423,7 @@ app.put('/api/servers-registry', async (req, res) => {
     }
 
     // If moving to envy (local), remove port_offset
-    if (target === 'envy') {
+    if (target === 'local') {
       delete parsed.servers[serverName].port_offset;
       parsed.servers[serverName].reason = 'Local';
     } else if (parsed.servers[serverName].port_offset === undefined) {
@@ -482,7 +482,7 @@ app.post('/api/servers-registry/batch', async (req, res) => {
       } else {
         parsed.servers[serverName].target = target;
       }
-      if (target === 'envy') {
+      if (target === 'local') {
         delete parsed.servers[serverName].port_offset;
         parsed.servers[serverName].reason = 'Local';
       } else if (parsed.servers[serverName].port_offset === undefined) {
@@ -516,7 +516,7 @@ app.post('/api/servers-registry/batch', async (req, res) => {
     const registry = {};
     for (const [name, cfg] of Object.entries(parsed.servers)) {
       const machine = machines[cfg.target] || {};
-      registry[name] = { target: cfg.target, host: machine.host || 'localhost', port: machine.base_port ? machine.base_port + (cfg.port_offset || 0) : null };
+      registry[name] = { target: cfg.target, host: machine.host || 'localhost', port: cfg.port || (machine.base_port ? machine.base_port + (cfg.port_offset || 0) : null) };
     }
     res.json({ success: true, changed: updates.length, registry });
   } catch (e) {
@@ -562,10 +562,10 @@ app.get('/api/resources', async (req, res) => {
         results[matched].memMB += Math.round(memKB / 1024);
       }
     }
-    // Classify: heavy if > 200MB memory
+    // Classify: heavy if > 300MB memory
     const classified = {};
     for (const [name, data] of Object.entries(results)) {
-      classified[name] = { ...data, weight: data.memMB > 200 ? 'heavy' : 'light' };
+      classified[name] = { ...data, weight: data.memMB > 300 ? 'heavy' : 'light' };
     }
     res.json(classified);
   } catch (e) {
@@ -581,7 +581,7 @@ app.get('/api/health', async (req, res) => {
     const registry = await regRes.json();
     const { createConnection } = await import('net');
     const checks = Object.entries(registry)
-      .filter(([, r]) => r.target !== 'envy' && r.port)
+      .filter(([, r]) => r.target !== 'local' && r.port)
       .map(([name, r]) => new Promise(resolve => {
         const sock = createConnection({ host: r.host, port: r.port, timeout: 1500 });
         sock.on('connect', () => { sock.destroy(); resolve([name, 'up']); });
@@ -621,7 +621,7 @@ app.post('/api/apply-remote-config', async (req, res) => {
     let changed = 0;
     for (const [name, config] of Object.entries(mcpServers)) {
       const srv = serversYaml[name];
-      if (!srv || srv.target === 'envy') continue;
+      if (!srv || srv.target === 'local') continue;
       const machine = machines[srv.target];
       if (!machine || !machine.base_port) continue;
       const port = machine.base_port + (srv.port_offset || 0);
