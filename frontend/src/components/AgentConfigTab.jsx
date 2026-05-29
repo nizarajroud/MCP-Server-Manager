@@ -244,7 +244,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             if (filterType === 'lan' && !isLan) return false;
             if (filterType === 'internet' && !isInet) return false;
             if (filterType === 'actifs' && c.disabled) return false;
-            if (filterType === 'heavy' && (!resources[n] || resources[n].weight !== 'heavy')) return false;
+            if (filterType === 'heavy' && (!resources[n] || resources[n].weight !== 'heavy' || (registry[n] && registry[n].target !== 'local'))) return false;
             return true;
           });
           for (const name of filtered) {
@@ -391,7 +391,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             <span onClick={() => { setFilterType(filterType === 'lan' ? null : 'lan'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'lan' ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
             <span onClick={() => { setFilterType(filterType === 'internet' ? null : 'internet'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'internet' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
             <span onClick={() => { setFilterType(filterType === 'actifs' ? null : 'actifs'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'actifs' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
-            <span onClick={() => { setFilterType(filterType === 'heavy' ? null : 'heavy'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'heavy' ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.values(resources).filter(r => r.weight === 'heavy').length}</strong></span>
+            <span onClick={() => { setFilterType(filterType === 'heavy' ? null : 'heavy'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'heavy' ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.entries(resources).filter(([n, r]) => r.weight === 'heavy' && (!registry[n] || registry[n].target === 'local')).length}</strong></span>
           </div>
 
           {/* Zone 2 — Recherche + Vue + Refresh */}
