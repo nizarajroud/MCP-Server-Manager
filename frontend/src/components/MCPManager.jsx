@@ -120,7 +120,11 @@ const MCPManager = () => {
       });
       setAgentSha(result.sha);
       setAgentContent(updatedContent);
-      showNotification(`Sauvegardé, commité et synchronisé ✓`);
+      if (result.warning) {
+        showNotification(`⚠️ ${result.warning}`, 'error');
+      } else {
+        showNotification(`Sauvegardé, commité et synchronisé ✓`);
+      }
       return true;
     } catch (e) {
       showNotification(`Erreur: ${e.message}`, 'error');
