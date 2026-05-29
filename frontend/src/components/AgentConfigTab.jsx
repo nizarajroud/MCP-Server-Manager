@@ -453,6 +453,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   const mcpServers = { ...agentContent.mcpServers };
                   for (const n of eligible) { const r = result.registry[n]; if (r?.port) { const cfg = mcpServers[n]; mcpServers[n] = { ...cfg, _original: cfg._original || { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false }; } }
                   await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to pcalt`);
+                  for (const n of eligible) { try { await api.serverControl(n, 'start', selectedBranch); } catch (e) {} }
                   await reloadHealth(); setDeploySelected(new Set());
                 } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
                 setBatchLoading(false);
@@ -468,6 +469,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   const mcpServers = { ...agentContent.mcpServers };
                   for (const n of eligible) { const cfg = mcpServers[n]; if (cfg._original) { mcpServers[n] = { ...cfg, command: cfg._original.command, args: cfg._original.args, disabled: false }; delete mcpServers[n]._original; } else { mcpServers[n] = { ...cfg, disabled: false }; } }
                   await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to local`);
+                  for (const n of eligible) { try { await api.serverControl(n, 'stop', selectedBranch); } catch (e) {} }
                   await reloadHealth(); setDeploySelected(new Set());
                 } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
                 setBatchLoading(false);
