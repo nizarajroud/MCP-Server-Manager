@@ -398,15 +398,24 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
         return (
         <div className="space-y-3">
           {/* Zone 1 — Filtres rapides */}
-          <div className="flex gap-2 text-sm flex-wrap">
+          <div className="flex gap-3 text-sm flex-wrap items-center">
             <span onClick={() => { setActiveFilters(new Set()); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.size === 0 ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>Total: <strong>{allServers.length}</strong></span>
-            <span onClick={() => { const s = new Set(activeFilters); s.has('critical') ? s.delete('critical') : s.add('critical'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('critical') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
-            <span onClick={() => { const s = new Set(activeFilters); s.has('normal') ? s.delete('normal') : s.add('normal'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('normal') ? 'bg-yellow-600 text-white ring-2 ring-yellow-400' : 'bg-yellow-900/50 text-yellow-300 hover:bg-yellow-800/50'}`}>○ Normal: <strong>{allServers.length - totalCritical}</strong></span>
-            <span onClick={() => { const s = new Set(activeFilters); s.has('local') ? s.delete('local') : s.add('local'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('local') ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 Local: <strong>{totalDirect}</strong></span>
-            <span onClick={() => { const s = new Set(activeFilters); s.has('lan') ? s.delete('lan') : s.add('lan'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('lan') ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
-            <span onClick={() => { const s = new Set(activeFilters); s.has('internet') ? s.delete('internet') : s.add('internet'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('internet') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
-            <span onClick={() => { const s = new Set(activeFilters); s.has('actifs') ? s.delete('actifs') : s.add('actifs'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('actifs') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
-            <span onClick={() => { const s = new Set(activeFilters); s.has('disabled') ? s.delete('disabled') : s.add('disabled'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('disabled') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>✗ Désactivés: <strong>{allServers.length - totalEnabled}</strong></span>
+            <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
+              <span className="text-[10px] text-slate-500 mr-1">Priorité</span>
+              <span onClick={() => { const s = new Set(activeFilters); s.has('critical') ? s.delete('critical') : s.add('critical'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('critical') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 {totalCritical}</span>
+              <span onClick={() => { const s = new Set(activeFilters); s.has('normal') ? s.delete('normal') : s.add('normal'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('normal') ? 'bg-yellow-600 text-white ring-2 ring-yellow-400' : 'bg-yellow-900/50 text-yellow-300 hover:bg-yellow-800/50'}`}>○ {allServers.length - totalCritical}</span>
+            </div>
+            <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
+              <span className="text-[10px] text-slate-500 mr-1">Ressource</span>
+              <span onClick={() => { const s = new Set(activeFilters); s.has('local') ? s.delete('local') : s.add('local'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('local') ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 {totalDirect}</span>
+              <span onClick={() => { const s = new Set(activeFilters); s.has('lan') ? s.delete('lan') : s.add('lan'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('lan') ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 {totalLAN}</span>
+              <span onClick={() => { const s = new Set(activeFilters); s.has('internet') ? s.delete('internet') : s.add('internet'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('internet') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 {totalInternet}</span>
+            </div>
+            <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
+              <span className="text-[10px] text-slate-500 mr-1">État</span>
+              <span onClick={() => { const s = new Set(activeFilters); s.has('actifs') ? s.delete('actifs') : s.add('actifs'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('actifs') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ {totalEnabled}</span>
+              <span onClick={() => { const s = new Set(activeFilters); s.has('disabled') ? s.delete('disabled') : s.add('disabled'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('disabled') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>✗ {allServers.length - totalEnabled}</span>
+            </div>
             <span onClick={() => { const s = new Set(activeFilters); s.has('heavy') ? s.delete('heavy') : s.add('heavy'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('heavy') ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.entries(resources).filter(([n, r]) => r.weight === 'heavy' && (!registry[n] || registry[n].target === 'local')).length}</strong></span>
           </div>
 
@@ -429,70 +438,79 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
           </div>
           {deploySelected.size > 0 && (
             <div className="flex items-center gap-3 px-3 py-2 bg-slate-700/50 rounded-lg border border-slate-600 flex-wrap">
-              <span className="text-sm text-slate-300">☑ {deploySelected.size} sélectionné{deploySelected.size > 1 ? 's' : ''}</span>
-              <button disabled={batchLoading} onClick={async () => {
-                setBatchLoading(true);
-                const mcpServers = { ...agentContent.mcpServers };
-                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], disabled: false };
-                await saveToGitHub(mcpServers, `feat: enable ${deploySelected.size} servers`);
-                setDeploySelected(new Set()); setBatchLoading(false);
-              }} className="px-3 py-1.5 bg-green-600/20 hover:bg-green-600/40 border border-green-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🟢 Activer</button>
-              <button disabled={batchLoading} onClick={async () => {
-                setBatchLoading(true);
-                const mcpServers = { ...agentContent.mcpServers };
-                const eligible = [...deploySelected].filter(n => (mcpServers[n]?.priority || 'standard') !== 'critical');
-                if (!eligible.length) { showNotification('Critiques exclus', 'error'); setBatchLoading(false); return; }
-                for (const n of eligible) mcpServers[n] = { ...mcpServers[n], disabled: true };
-                await saveToGitHub(mcpServers, `feat: disable ${eligible.length} servers`);
-                setDeploySelected(new Set()); setBatchLoading(false);
-              }} className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 border border-red-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🔴 Désactiver</button>
-              <button disabled={batchLoading} onClick={async () => {
-                setBatchLoading(true);
-                try {
-                  const eligible = [...deploySelected].filter(n => { const c = agentContent.mcpServers[n]; return (c.priority || 'standard') !== 'critical' && !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); });
-                  if (!eligible.length) { showNotification('Aucun éligible', 'error'); setBatchLoading(false); return; }
-                  const updates = eligible.map(n => ({ serverName: n, target: 'pcalt' }));
-                  const result = await api.batchUpdateTargets(updates, selectedBranch);
-                  setRegistry(result.registry);
+              <span className="text-sm text-slate-300">☑ {deploySelected.size}</span>
+              <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
+                <span className="text-[10px] text-slate-500 mr-1">État</span>
+                <button disabled={batchLoading} onClick={async () => {
+                  setBatchLoading(true);
                   const mcpServers = { ...agentContent.mcpServers };
-                  for (const n of eligible) { const r = result.registry[n]; if (r?.port) { const cfg = mcpServers[n]; mcpServers[n] = { ...cfg, _original: cfg._original || { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false }; } }
-                  await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to pcalt`);
-                  for (const n of eligible) { try { await api.serverControl(n, 'start', selectedBranch); } catch (e) {} }
-                  await reloadHealth(); setDeploySelected(new Set());
-                } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
-                setBatchLoading(false);
-              }} className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">💻 → pcalt</button>
-              <button disabled={batchLoading} onClick={async () => {
-                setBatchLoading(true);
-                try {
-                  const eligible = [...deploySelected].filter(n => (agentContent.mcpServers[n]?.priority || 'standard') !== 'critical');
+                  for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], disabled: false };
+                  await saveToGitHub(mcpServers, `feat: enable ${deploySelected.size} servers`);
+                  setDeploySelected(new Set()); setBatchLoading(false);
+                }} className="px-2 py-1 bg-green-600/20 hover:bg-green-600/40 border border-green-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🟢</button>
+                <button disabled={batchLoading} onClick={async () => {
+                  setBatchLoading(true);
+                  const mcpServers = { ...agentContent.mcpServers };
+                  const eligible = [...deploySelected].filter(n => (mcpServers[n]?.priority || 'standard') !== 'critical');
                   if (!eligible.length) { showNotification('Critiques exclus', 'error'); setBatchLoading(false); return; }
-                  const updates = eligible.map(n => ({ serverName: n, target: 'local' }));
-                  const result = await api.batchUpdateTargets(updates, selectedBranch);
-                  setRegistry(result.registry);
+                  for (const n of eligible) mcpServers[n] = { ...mcpServers[n], disabled: true };
+                  await saveToGitHub(mcpServers, `feat: disable ${eligible.length} servers`);
+                  setDeploySelected(new Set()); setBatchLoading(false);
+                }} className="px-2 py-1 bg-red-600/20 hover:bg-red-600/40 border border-red-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🔴</button>
+              </div>
+              <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
+                <span className="text-[10px] text-slate-500 mr-1">Ressource</span>
+                <button disabled={batchLoading} onClick={async () => {
+                  setBatchLoading(true);
+                  try {
+                    const eligible = [...deploySelected].filter(n => { const c = agentContent.mcpServers[n]; return (c.priority || 'standard') !== 'critical' && !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); });
+                    if (!eligible.length) { showNotification('Aucun éligible', 'error'); setBatchLoading(false); return; }
+                    const updates = eligible.map(n => ({ serverName: n, target: 'pcalt' }));
+                    const result = await api.batchUpdateTargets(updates, selectedBranch);
+                    setRegistry(result.registry);
+                    const mcpServers = { ...agentContent.mcpServers };
+                    for (const n of eligible) { const r = result.registry[n]; if (r?.port) { const cfg = mcpServers[n]; mcpServers[n] = { ...cfg, _original: cfg._original || { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false }; } }
+                    await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to pcalt`);
+                    for (const n of eligible) { try { await api.serverControl(n, 'start', selectedBranch); } catch (e) {} }
+                    await reloadHealth(); setDeploySelected(new Set());
+                  } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
+                  setBatchLoading(false);
+                }} className="px-2 py-1 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">💻 pcalt</button>
+                <button disabled={batchLoading} onClick={async () => {
+                  setBatchLoading(true);
+                  try {
+                    const eligible = [...deploySelected].filter(n => (agentContent.mcpServers[n]?.priority || 'standard') !== 'critical');
+                    if (!eligible.length) { showNotification('Critiques exclus', 'error'); setBatchLoading(false); return; }
+                    const updates = eligible.map(n => ({ serverName: n, target: 'local' }));
+                    const result = await api.batchUpdateTargets(updates, selectedBranch);
+                    setRegistry(result.registry);
+                    const mcpServers = { ...agentContent.mcpServers };
+                    for (const n of eligible) { const cfg = mcpServers[n]; if (cfg._original) { mcpServers[n] = { ...cfg, command: cfg._original.command, args: cfg._original.args, disabled: false }; delete mcpServers[n]._original; } else { mcpServers[n] = { ...cfg, disabled: false }; } }
+                    await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to local`);
+                    for (const n of eligible) { try { await api.serverControl(n, 'stop', selectedBranch); } catch (e) {} }
+                    await reloadHealth(); setDeploySelected(new Set());
+                  } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
+                  setBatchLoading(false);
+                }} className="px-2 py-1 bg-slate-600/20 hover:bg-slate-600/40 border border-slate-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">📦 Local</button>
+              </div>
+              <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
+                <span className="text-[10px] text-slate-500 mr-1">Priorité</span>
+                <button disabled={batchLoading} onClick={async () => {
+                  setBatchLoading(true);
                   const mcpServers = { ...agentContent.mcpServers };
-                  for (const n of eligible) { const cfg = mcpServers[n]; if (cfg._original) { mcpServers[n] = { ...cfg, command: cfg._original.command, args: cfg._original.args, disabled: false }; delete mcpServers[n]._original; } else { mcpServers[n] = { ...cfg, disabled: false }; } }
-                  await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to local`);
-                  for (const n of eligible) { try { await api.serverControl(n, 'stop', selectedBranch); } catch (e) {} }
-                  await reloadHealth(); setDeploySelected(new Set());
-                } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
-                setBatchLoading(false);
-              }} className="px-3 py-1.5 bg-slate-600/20 hover:bg-slate-600/40 border border-slate-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">📦 → Local</button>
-              <button disabled={batchLoading} onClick={async () => {
-                setBatchLoading(true);
-                const mcpServers = { ...agentContent.mcpServers };
-                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], priority: 'critical' };
-                await saveToGitHub(mcpServers, `feat: set ${deploySelected.size} servers as critical`);
-                setDeploySelected(new Set()); setBatchLoading(false);
-              }} className="px-3 py-1.5 bg-red-900/20 hover:bg-red-900/40 border border-red-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🔴 Critique</button>
-              <button disabled={batchLoading} onClick={async () => {
-                setBatchLoading(true);
-                const mcpServers = { ...agentContent.mcpServers };
-                for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], priority: 'standard' };
-                await saveToGitHub(mcpServers, `feat: set ${deploySelected.size} servers as normal`);
-                setDeploySelected(new Set()); setBatchLoading(false);
-              }} className="px-3 py-1.5 bg-yellow-900/20 hover:bg-yellow-900/40 border border-yellow-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🟡 Normal</button>
-              {batchLoading && <span className="text-xs text-purple-300 animate-pulse">⏳ En cours...</span>}
+                  for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], priority: 'critical' };
+                  await saveToGitHub(mcpServers, `feat: set ${deploySelected.size} servers as critical`);
+                  setDeploySelected(new Set()); setBatchLoading(false);
+                }} className="px-2 py-1 bg-red-900/20 hover:bg-red-900/40 border border-red-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">⭐</button>
+                <button disabled={batchLoading} onClick={async () => {
+                  setBatchLoading(true);
+                  const mcpServers = { ...agentContent.mcpServers };
+                  for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], priority: 'standard' };
+                  await saveToGitHub(mcpServers, `feat: set ${deploySelected.size} servers as normal`);
+                  setDeploySelected(new Set()); setBatchLoading(false);
+                }} className="px-2 py-1 bg-yellow-900/20 hover:bg-yellow-900/40 border border-yellow-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">○</button>
+              </div>
+              {batchLoading && <span className="text-xs text-purple-300 animate-pulse">⏳</span>}
             </div>
           )}
           {(() => {
