@@ -243,6 +243,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             if (activeFilters.has('normal') && (c.priority || 'standard') === 'critical') return false;
             // State filter (intersection)
             if (activeFilters.has('actifs') && c.disabled) return false;
+            if (activeFilters.has('disabled') && !c.disabled) return false;
             if (activeFilters.has('heavy') && (!resources[n] || resources[n].weight !== 'heavy' || (registry[n] && registry[n].target !== 'local'))) return false;
             // Resource filters (union within group)
             const resourceFilters = ['local', 'lan', 'internet'].filter(f => activeFilters.has(f));
@@ -405,6 +406,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             <span onClick={() => { const s = new Set(activeFilters); s.has('lan') ? s.delete('lan') : s.add('lan'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('lan') ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
             <span onClick={() => { const s = new Set(activeFilters); s.has('internet') ? s.delete('internet') : s.add('internet'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('internet') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
             <span onClick={() => { const s = new Set(activeFilters); s.has('actifs') ? s.delete('actifs') : s.add('actifs'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('actifs') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('disabled') ? s.delete('disabled') : s.add('disabled'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('disabled') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>✗ Désactivés: <strong>{allServers.length - totalEnabled}</strong></span>
             <span onClick={() => { const s = new Set(activeFilters); s.has('heavy') ? s.delete('heavy') : s.add('heavy'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('heavy') ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.entries(resources).filter(([n, r]) => r.weight === 'heavy' && (!registry[n] || registry[n].target === 'local')).length}</strong></span>
           </div>
 
