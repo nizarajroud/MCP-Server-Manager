@@ -367,6 +367,12 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                             if (port) { mcpServers[name] = { ...serverCfg, _original: serverCfg._original || { command: serverCfg.command, args: serverCfg.args }, command: 'npx', args: ['mcp-remote', `http://192.168.2.56:${port}/mcp`, '--allow-http'], disabled: false }; }
                           }
                           await saveToGitHub(mcpServers, `feat: ${target === 'local' ? 'restore local' : 'switch to remote'} ${name}`);
+                          // Auto start/stop server on remote
+                          if (target !== 'local') {
+                            try { await api.serverControl(name, 'start', selectedBranch); } catch (e) {}
+                          } else {
+                            try { await api.serverControl(name, 'stop', selectedBranch); } catch (e) {}
+                          }
                           reloadRegistry(); reloadHealth();
                         } catch (err) { showNotification(`Erreur: ${err.message}`, 'error'); }
                       }} className="px-2 py-1 bg-slate-900 border border-slate-600 rounded text-xs focus:border-purple-500 focus:outline-none">

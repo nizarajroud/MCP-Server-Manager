@@ -573,6 +573,53 @@ app.get('/api/resources', async (req, res) => {
   }
 });
 
+// POST /api/server-control — Start or stop a server on a remote machine via SSH
+app.post('/api/server-control', async (req, res) => {
+  try {
+    const { serverName, action, branch } = req.body;
+    if (!serverName || !action || !branch) return res.status(400).json({ error: 'serverName, action (start|stop), branch required' });
+
+    const { exec } = await import('child_process');
+    const { promisify } = await import('util');
+    const execAsync = promisify(exec);
+
+    // Get server info from registry
+    const regRes = await githubFetch(`/contents/${SERVERS_YAML_PATH}?ref=${branch}`);
+    if (!regRes.ok) return res.status(404).json({ error: 'servers.yaml not found' });
+    const regFile = await regRes.json();
+    const parsed = yaml.load(Buffer.from(regFile.content, 'base64').toString('utf-8'));
+    const srv = parsed.servers?.[serverName];
+    const machine = parsed.machines?.[srv?.target];
+    if (!srv || !machine || srv.target === 'local') return res.status(400).json({ error: 'Server is local or not found' });
+
+    const port = srv.port || (machine.base_port + (srv.port_offset || 0));
+    const sshCmd = `ssh -p ${machine.ssh_port || 22} -i ~/.ssh/id_rsa_wsl -o StrictHostKeyChecking=no ${machine.ssh_user || 'nizar'}@${machine.host}`;
+
+    if (action === 'stop') {
+      await execAsync(`${sshCmd} "pkill -f 'supergateway.*--port ${port}' 2>/dev/null || true"`);
+      res.json({ success: true, action: 'stop', serverName, port });
+    } else if (action === 'start') {
+      // Get command from agent configs
+      const agentFiles = await execAsync(`ls ${LOCAL_REPO_PATH}/agents/*.json`);
+      let stdio = '';
+      for (const file of agentFiles.stdout.trim().split('\n')) {
+        const { stdout } = await execAsync(`jq -r '.mcpServers."${serverName}"._original // .mcpServers."${serverName}" | if .command then .command + " " + (.args // [] | join(" ")) else empty end' "${file}" 2>/dev/null`);
+        if (stdout.trim() && !stdout.includes('mcp-remote')) { stdio = stdout.trim(); break; }
+      }
+      if (!stdio) return res.status(404).json({ error: `Command not found for ${serverName}` });
+
+      // Source .env and start supergateway
+      await execAsync(`${sshCmd} "pkill -f 'supergateway.*--port ${port}' 2>/dev/null || true"`);
+      await execAsync(`${sshCmd} "source ~/HomeWspce/kiro-configs/.env 2>/dev/null; nohup npx -y supergateway --stdio '${stdio}' --port ${port} --outputTransport streamableHttp > /tmp/mcp-${serverName}.log 2>&1 &"`);
+      res.json({ success: true, action: 'start', serverName, port, stdio });
+    } else {
+      res.status(400).json({ error: 'action must be start or stop' });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // GET /api/health — TCP port check on remote servers
 app.get('/api/health', async (req, res) => {
   try {
