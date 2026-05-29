@@ -131,6 +131,16 @@ export const api = {
     return res.json();
   },
 
+  async serverControl(serverName, action, branch) {
+    const res = await fetch(`${API_URL}/api/server-control`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serverName, action, branch })
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.error); }
+    return res.json();
+  },
+
   async applyRemoteConfig(agent, branch) {
     const res = await fetch(`${API_URL}/api/apply-remote-config`, {
       method: 'POST',
