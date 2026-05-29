@@ -15,8 +15,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
   const [deploySelected, setDeploySelected] = useState(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
   const [collapsedCats, setCollapsedCats] = useState(new Set());
-  const [filterCritical, setFilterCritical] = useState(false);
-  const [filterType, setFilterType] = useState(null);
+  const [activeFilters, setActiveFilters] = useState(new Set());
   const [form, setForm] = useState({ name: '', description: '', welcomeMessage: '' });
   const [promptContent, setPromptContent] = useState('');
   const [promptFilePath, setPromptFilePath] = useState('');
@@ -236,15 +235,22 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
           const grouped = {};
           const filtered = allServers.filter(n => {
             if (deploySearch && !n.toLowerCase().includes(deploySearch.toLowerCase())) return false;
-            if (filterCritical && (agentContent.mcpServers[n].priority || 'standard') !== 'critical') return false;
             const c = agentContent.mcpServers[n];
             const isInet = c.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws')));
             const isLan = c.args?.includes('mcp-remote') && !isInet;
-            if (filterType === 'local' && (isInet || isLan)) return false;
-            if (filterType === 'lan' && !isLan) return false;
-            if (filterType === 'internet' && !isInet) return false;
-            if (filterType === 'actifs' && c.disabled) return false;
-            if (filterType === 'heavy' && (!resources[n] || resources[n].weight !== 'heavy' || (registry[n] && registry[n].target !== 'local'))) return false;
+            // Priority filter (intersection)
+            if (activeFilters.has('critical') && (c.priority || 'standard') !== 'critical') return false;
+            // State filter (intersection)
+            if (activeFilters.has('actifs') && c.disabled) return false;
+            if (activeFilters.has('heavy') && (!resources[n] || resources[n].weight !== 'heavy' || (registry[n] && registry[n].target !== 'local'))) return false;
+            // Resource filters (union within group)
+            const resourceFilters = ['local', 'lan', 'internet'].filter(f => activeFilters.has(f));
+            if (resourceFilters.length > 0) {
+              const matchesLocal = resourceFilters.includes('local') && !isInet && !isLan;
+              const matchesLan = resourceFilters.includes('lan') && isLan;
+              const matchesInternet = resourceFilters.includes('internet') && isInet;
+              if (!matchesLocal && !matchesLan && !matchesInternet) return false;
+            }
             return true;
           });
           for (const name of filtered) {
@@ -253,7 +259,7 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             grouped[cat].push(name);
           }
           // Sort within categories
-          if (filterType === 'heavy') {
+          if (activeFilters.has('heavy')) {
             for (const cat of Object.keys(grouped)) {
               grouped[cat].sort((a, b) => ((resources[b]?.memMB || 0) - (resources[a]?.memMB || 0)));
             }
@@ -386,12 +392,12 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
           {/* Zone 1 — Filtres rapides */}
           <div className="flex gap-2 text-sm flex-wrap">
             <span className="px-2 py-1 bg-slate-700 rounded">Total: <strong>{allServers.length}</strong></span>
-            <span onClick={() => { setFilterCritical(!filterCritical); setFilterType(null); if (!filterCritical) setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterCritical ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
-            <span onClick={() => { setFilterType(filterType === 'local' ? null : 'local'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'local' ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 Local: <strong>{totalDirect}</strong></span>
-            <span onClick={() => { setFilterType(filterType === 'lan' ? null : 'lan'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'lan' ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
-            <span onClick={() => { setFilterType(filterType === 'internet' ? null : 'internet'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'internet' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
-            <span onClick={() => { setFilterType(filterType === 'actifs' ? null : 'actifs'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'actifs' ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
-            <span onClick={() => { setFilterType(filterType === 'heavy' ? null : 'heavy'); setFilterCritical(false); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${filterType === 'heavy' ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.entries(resources).filter(([n, r]) => r.weight === 'heavy' && (!registry[n] || registry[n].target === 'local')).length}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('critical') ? s.delete('critical') : s.add('critical'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('critical') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 Critiques: <strong>{totalCritical}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('local') ? s.delete('local') : s.add('local'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('local') ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 Local: <strong>{totalDirect}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('lan') ? s.delete('lan') : s.add('lan'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('lan') ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 LAN: <strong>{totalLAN}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('internet') ? s.delete('internet') : s.add('internet'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('internet') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 Internet: <strong>{totalInternet}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('actifs') ? s.delete('actifs') : s.add('actifs'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('actifs') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ Actifs: <strong>{totalEnabled}</strong></span>
+            <span onClick={() => { const s = new Set(activeFilters); s.has('heavy') ? s.delete('heavy') : s.add('heavy'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('heavy') ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.entries(resources).filter(([n, r]) => r.weight === 'heavy' && (!registry[n] || registry[n].target === 'local')).length}</strong></span>
           </div>
 
           {/* Zone 2 — Recherche + Vue + Refresh */}
