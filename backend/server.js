@@ -610,7 +610,7 @@ app.post('/api/server-control', async (req, res) => {
 
       // Source .env and start supergateway
       await execAsync(`${sshCmd} "pkill -f 'supergateway.*--port ${port}' 2>/dev/null || true"`);
-      await execAsync(`${sshCmd} "source ~/HomeWspce/kiro-configs/.env 2>/dev/null; nohup npx -y supergateway --stdio '${stdio}' --port ${port} --outputTransport streamableHttp > /tmp/mcp-${serverName}.log 2>&1 &"`);
+      await execAsync(`${sshCmd} "source ~/HomeWspce/kiro-configs/.env 2>/dev/null; nohup npx -y supergateway --stdio '${stdio}' --port ${port} --outputTransport streamableHttp --stateful > /tmp/mcp-${serverName}.log 2>&1 &"`);
       res.json({ success: true, action: 'start', serverName, port, stdio });
     } else {
       res.status(400).json({ error: 'action must be start or stop' });
