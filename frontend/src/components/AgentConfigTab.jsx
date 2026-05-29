@@ -16,6 +16,18 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
   const [batchLoading, setBatchLoading] = useState(false);
   const [collapsedCats, setCollapsedCats] = useState(new Set());
   const [activeFilters, setActiveFilters] = useState(new Set());
+
+  const toggleFilter = (key, e) => {
+    let s;
+    if (e?.shiftKey) {
+      s = new Set(activeFilters);
+    } else {
+      s = activeFilters.has(key) ? new Set() : new Set();
+    }
+    s.has(key) ? s.delete(key) : s.add(key);
+    setActiveFilters(s);
+    setCollapsedCats(new Set());
+  };
   const [form, setForm] = useState({ name: '', description: '', welcomeMessage: '' });
   const [promptContent, setPromptContent] = useState('');
   const [promptFilePath, setPromptFilePath] = useState('');
@@ -402,21 +414,21 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
             <span onClick={() => { setActiveFilters(new Set()); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.size === 0 ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>Total: <strong>{allServers.length}</strong></span>
             <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
               <span className="text-[10px] text-slate-500 mr-1">Priorité</span>
-              <span onClick={() => { const s = new Set(activeFilters); s.has('critical') ? s.delete('critical') : s.add('critical'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('critical') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 {totalCritical}</span>
-              <span onClick={() => { const s = new Set(activeFilters); s.has('normal') ? s.delete('normal') : s.add('normal'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('normal') ? 'bg-yellow-600 text-white ring-2 ring-yellow-400' : 'bg-yellow-900/50 text-yellow-300 hover:bg-yellow-800/50'}`}>○ {allServers.length - totalCritical}</span>
+              <span onClick={(e) => toggleFilter('critical', e)} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('critical') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>🔴 {totalCritical}</span>
+              <span onClick={(e) => toggleFilter('normal', e)} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('normal') ? 'bg-yellow-600 text-white ring-2 ring-yellow-400' : 'bg-yellow-900/50 text-yellow-300 hover:bg-yellow-800/50'}`}>○ {allServers.length - totalCritical}</span>
             </div>
             <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
               <span className="text-[10px] text-slate-500 mr-1">Ressource</span>
-              <span onClick={() => { const s = new Set(activeFilters); s.has('local') ? s.delete('local') : s.add('local'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('local') ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 {totalDirect}</span>
-              <span onClick={() => { const s = new Set(activeFilters); s.has('lan') ? s.delete('lan') : s.add('lan'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('lan') ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 {totalLAN}</span>
-              <span onClick={() => { const s = new Set(activeFilters); s.has('internet') ? s.delete('internet') : s.add('internet'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('internet') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 {totalInternet}</span>
+              <span onClick={(e) => toggleFilter('local', e)} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('local') ? 'bg-slate-500 text-white ring-2 ring-slate-400' : 'bg-slate-700 hover:bg-slate-600'}`}>📦 {totalDirect}</span>
+              <span onClick={(e) => toggleFilter('lan', e)} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('lan') ? 'bg-purple-600 text-white ring-2 ring-purple-400' : 'bg-purple-900/50 text-purple-300 hover:bg-purple-800/50'}`}>💻 {totalLAN}</span>
+              <span onClick={(e) => toggleFilter('internet', e)} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('internet') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>🌐 {totalInternet}</span>
             </div>
             <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
               <span className="text-[10px] text-slate-500 mr-1">État</span>
-              <span onClick={() => { const s = new Set(activeFilters); s.has('actifs') ? s.delete('actifs') : s.add('actifs'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('actifs') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ {totalEnabled}</span>
-              <span onClick={() => { const s = new Set(activeFilters); s.has('disabled') ? s.delete('disabled') : s.add('disabled'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('disabled') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>✗ {allServers.length - totalEnabled}</span>
+              <span onClick={(e) => toggleFilter('actifs', e)} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('actifs') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ {totalEnabled}</span>
+              <span onClick={(e) => toggleFilter('disabled', e)} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('disabled') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>✗ {allServers.length - totalEnabled}</span>
             </div>
-            <span onClick={() => { const s = new Set(activeFilters); s.has('heavy') ? s.delete('heavy') : s.add('heavy'); setActiveFilters(s); setCollapsedCats(new Set()); }} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('heavy') ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.entries(resources).filter(([n, r]) => r.weight === 'heavy' && (!registry[n] || registry[n].target === 'local')).length}</strong></span>
+            <span onClick={(e) => toggleFilter('heavy', e)} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('heavy') ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.entries(resources).filter(([n, r]) => r.weight === 'heavy' && (!registry[n] || registry[n].target === 'local')).length}</strong></span>
           </div>
 
           {/* Zone 2 — Recherche + Vue + Refresh */}
@@ -463,22 +475,6 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                 <button disabled={batchLoading} onClick={async () => {
                   setBatchLoading(true);
                   try {
-                    const eligible = [...deploySelected].filter(n => { const c = agentContent.mcpServers[n]; return (c.priority || 'standard') !== 'critical' && !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); });
-                    if (!eligible.length) { showNotification('Aucun éligible', 'error'); setBatchLoading(false); return; }
-                    const updates = eligible.map(n => ({ serverName: n, target: 'pcalt' }));
-                    const result = await api.batchUpdateTargets(updates, selectedBranch);
-                    setRegistry(result.registry);
-                    const mcpServers = { ...agentContent.mcpServers };
-                    for (const n of eligible) { const r = result.registry[n]; if (r?.port) { const cfg = mcpServers[n]; mcpServers[n] = { ...cfg, _original: cfg._original || { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false }; } }
-                    await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to pcalt`);
-                    for (const n of eligible) { try { await api.serverControl(n, 'start', selectedBranch); } catch (e) {} }
-                    await reloadHealth(); setDeploySelected(new Set());
-                  } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
-                  setBatchLoading(false);
-                }} className="px-2 py-1 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">💻 pcalt</button>
-                <button disabled={batchLoading} onClick={async () => {
-                  setBatchLoading(true);
-                  try {
                     const eligible = [...deploySelected].filter(n => (agentContent.mcpServers[n]?.priority || 'standard') !== 'critical');
                     if (!eligible.length) { showNotification('Critiques exclus', 'error'); setBatchLoading(false); return; }
                     const updates = eligible.map(n => ({ serverName: n, target: 'local' }));
@@ -492,6 +488,22 @@ const AgentConfigTab = ({ agents, selectedAgent, agentContent, agentSha, selecte
                   } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
                   setBatchLoading(false);
                 }} className="px-2 py-1 bg-slate-600/20 hover:bg-slate-600/40 border border-slate-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">📦 Local</button>
+                <button disabled={batchLoading} onClick={async () => {
+                  setBatchLoading(true);
+                  try {
+                    const eligible = [...deploySelected].filter(n => { const c = agentContent.mcpServers[n]; return (c.priority || 'standard') !== 'critical' && !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); });
+                    if (!eligible.length) { showNotification('Aucun éligible', 'error'); setBatchLoading(false); return; }
+                    const updates = eligible.map(n => ({ serverName: n, target: 'pcalt' }));
+                    const result = await api.batchUpdateTargets(updates, selectedBranch);
+                    setRegistry(result.registry);
+                    const mcpServers = { ...agentContent.mcpServers };
+                    for (const n of eligible) { const r = result.registry[n]; if (r?.port) { const cfg = mcpServers[n]; mcpServers[n] = { ...cfg, _original: cfg._original || { command: cfg.command, args: cfg.args }, command: 'npx', args: ['mcp-remote', `http://${r.host}:${r.port}/mcp`, '--allow-http'], disabled: false }; } }
+                    await saveToGitHub(mcpServers, `feat: move ${eligible.length} servers to pcalt`);
+                    for (const n of eligible) { try { await api.serverControl(n, 'start', selectedBranch); } catch (e) {} }
+                    await reloadHealth(); setDeploySelected(new Set());
+                  } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
+                  setBatchLoading(false);
+                }} className="px-2 py-1 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">💻 pcalt</button>
               </div>
               <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
                 <span className="text-[10px] text-slate-500 mr-1">Priorité</span>
