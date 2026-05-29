@@ -97,9 +97,9 @@ app.put('/api/categories', async (req, res) => {
     const result = await response.json();
 
     // 3. GIT PULL: sync local repo
-    await pullLocalRepo(branch);
+    const { warning: pullWarning } = await pullLocalRepo(branch);
 
-    res.json({ success: true, sha: result.content.sha });
+    res.json({ success: true, sha: result.content.sha, warning: pullWarning });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -145,38 +145,36 @@ app.get('/api/agent/:name', async (req, res) => {
   }
 });
 
-// Helper: sync a single file from GitHub to local ~/.kiro/agents/
-const syncFileToLocal = async (filePath, branch) => {
-  const { default: fs } = await import('fs/promises');
-  const { default: path } = await import('path');
-  const { default: os } = await import('os');
-
-  const agentsDir = path.join(os.homedir(), '.kiro', 'agents');
-  await fs.mkdir(agentsDir, { recursive: true });
-
-  const response = await githubFetch(`/contents/${filePath}?ref=${branch}`);
-  if (response.ok) {
-    const fileData = await response.json();
-    const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
-    const localFile = path.join(agentsDir, path.basename(filePath));
-    await fs.writeFile(localFile, content);
-    return localFile;
-  }
-  return null;
-};
 
 // Helper: git pull --rebase on local repo to sync with remote
 const pullLocalRepo = async (branch) => {
   const { exec } = await import('child_process');
   const { promisify } = await import('util');
   const execAsync = promisify(exec);
+  let stashed = false;
+  let warning = null;
   try {
-    await execAsync(`git -C ${LOCAL_REPO_PATH} checkout -- . 2>/dev/null || true`);
+    // Check for local changes
+    const { stdout: status } = await execAsync(`git -C ${LOCAL_REPO_PATH} status --porcelain`);
+    if (status.trim()) {
+      // Stash local changes
+      await execAsync(`git -C ${LOCAL_REPO_PATH} stash push -m "auto-stash before pull"`);
+      stashed = true;
+    }
     await execAsync(`git -C ${LOCAL_REPO_PATH} checkout ${branch} 2>/dev/null || true`);
     await execAsync(`git -C ${LOCAL_REPO_PATH} pull --rebase origin ${branch}`);
+    // Restore stashed changes
+    if (stashed) {
+      try {
+        await execAsync(`git -C ${LOCAL_REPO_PATH} stash pop`);
+      } catch (e) {
+        warning = 'Conflit avec des changements locaux — vérifiez git stash';
+      }
+    }
   } catch (e) {
     console.error('Git pull failed:', e.message);
   }
+  return { warning };
 };
 
 // PUT /api/agent/:name — Rebase + Commit + Push + Sync local
@@ -219,13 +217,10 @@ app.put('/api/agent/:name', async (req, res) => {
 
     const result = await response.json();
 
-    // 3. SYNC LOCAL: Download updated file to ~/.kiro/agents/
-    const localPath = await syncFileToLocal(filePath, branch);
+    // 3. GIT PULL: Sync local repo with remote
+    const { warning: pullWarning } = await pullLocalRepo(branch);
 
-    // 4. GIT PULL: Sync local repo with remote
-    await pullLocalRepo(branch);
-
-    res.json({ success: true, sha: result.content.sha, commit: result.commit.sha, synced: localPath });
+    res.json({ success: true, sha: result.content.sha, commit: result.commit.sha, warning: pullWarning });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -357,7 +352,7 @@ app.put('/api/file', async (req, res) => {
         }
 
         // Git pull on local repo — this updates the local file
-        await pullLocalRepo(branch);
+        const { warning: pullWarning } = await pullLocalRepo(branch);
       } else {
         // File outside repo — just write locally
         await fs.writeFile(filePath, content);
@@ -450,7 +445,7 @@ app.put('/api/servers-registry', async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    await pullLocalRepo(branch);
+    const { warning: pullWarning } = await pullLocalRepo(branch);
 
     // Return updated registry entry
     const machine = parsed.machines?.[target] || {};
@@ -509,7 +504,7 @@ app.post('/api/servers-registry/batch', async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    await pullLocalRepo(branch);
+    const { warning: pullWarning } = await pullLocalRepo(branch);
 
     // Return updated registry
     const machines = parsed.machines || {};
@@ -706,8 +701,7 @@ app.post('/api/apply-remote-config', async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    await syncFileToLocal(filePath, branch);
-    await pullLocalRepo(branch);
+    const { warning: pullWarning } = await pullLocalRepo(branch);
 
     res.json({ success: true, changed });
   } catch (e) {
@@ -757,8 +751,7 @@ app.post('/api/restore-local-config', async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    await syncFileToLocal(filePath, branch);
-    await pullLocalRepo(branch);
+    const { warning: pullWarning } = await pullLocalRepo(branch);
 
     res.json({ success: true, changed });
   } catch (e) {
@@ -847,11 +840,9 @@ app.post('/api/move-server', async (req, res) => {
     }
 
     // 3. SYNC LOCAL
-    await syncFileToLocal(destPath, branch);
-    if (mode === 'move') await syncFileToLocal(srcPath, branch);
 
     // 4. GIT PULL: sync local repo
-    await pullLocalRepo(branch);
+    const { warning: pullWarning } = await pullLocalRepo(branch);
 
     res.json({ success: true, moved: serverNames, from: sourceAgent, to: destAgent, mode });
   } catch (error) {

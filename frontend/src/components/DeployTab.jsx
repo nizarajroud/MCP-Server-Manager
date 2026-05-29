@@ -163,6 +163,8 @@ const renderRow = (name, index) => {
           <td className="py-2 px-3 w-28">
             {isInternet ? (
               <span className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-300">🌐 Internet</span>
+            ) : cfg.locked ? (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-slate-600 text-slate-400">🔒 {reg?.target === 'local' || !reg ? 'Local' : reg.target}</span>
             ) : (
               <select value={reg?.target === 'local' || !reg ? 'local' : reg.target} onChange={async (e) => {
                 try {
@@ -288,7 +290,7 @@ return (
         <button disabled={batchLoading} onClick={async () => {
           setBatchLoading(true);
           try {
-            const eligible = [...deploySelected].filter(n => { const c = agentContent.mcpServers[n]; return (c.priority || 'standard') !== 'critical' && !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))); });
+            const eligible = [...deploySelected].filter(n => { const c = agentContent.mcpServers[n]; return (c.priority || 'standard') !== 'critical' && !c?.args?.some(a => typeof a === 'string' && (a.startsWith('https://') || a.includes('.api.aws'))) && !c?.locked; });
             if (!eligible.length) { showNotification('Aucun éligible', 'error'); setBatchLoading(false); return; }
             const updates = eligible.map(n => ({ serverName: n, target: 'pcalt' }));
             const result = await api.batchUpdateTargets(updates, selectedBranch);
@@ -301,6 +303,14 @@ return (
           } catch (e) { showNotification(`Erreur: ${e.message}`, 'error'); }
           setBatchLoading(false);
         }} className="px-2 py-1 bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">💻 pcalt</button>
+        <button disabled={batchLoading} onClick={async () => {
+          setBatchLoading(true);
+          const mcpServers = { ...agentContent.mcpServers };
+          const allLocked = [...deploySelected].every(n => mcpServers[n]?.locked);
+          for (const n of deploySelected) mcpServers[n] = { ...mcpServers[n], locked: !allLocked };
+          await saveToGitHub(mcpServers, `feat: ${allLocked ? 'unlock' : 'lock'} ${deploySelected.size} servers`);
+          setDeploySelected(new Set()); setBatchLoading(false);
+        }} className="px-2 py-1 bg-slate-600/20 hover:bg-slate-600/40 border border-slate-400 rounded-md text-xs font-medium active:scale-90 transition-transform disabled:opacity-50">🔒</button>
       </div>
       <div className="flex gap-1 items-center px-2 py-1 border border-slate-600 rounded-lg">
         <span className="text-[10px] text-slate-500 mr-1">Priorité</span>
