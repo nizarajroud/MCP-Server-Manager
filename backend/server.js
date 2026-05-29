@@ -145,25 +145,6 @@ app.get('/api/agent/:name', async (req, res) => {
   }
 });
 
-// Helper: sync a single file from GitHub to local ~/.kiro/agents/
-const syncFileToLocal = async (filePath, branch) => {
-  const { default: fs } = await import('fs/promises');
-  const { default: path } = await import('path');
-  const { default: os } = await import('os');
-
-  const agentsDir = path.join(os.homedir(), '.kiro', 'agents');
-  await fs.mkdir(agentsDir, { recursive: true });
-
-  const response = await githubFetch(`/contents/${filePath}?ref=${branch}`);
-  if (response.ok) {
-    const fileData = await response.json();
-    const content = Buffer.from(fileData.content, 'base64').toString('utf-8');
-    const localFile = path.join(agentsDir, path.basename(filePath));
-    await fs.writeFile(localFile, content);
-    return localFile;
-  }
-  return null;
-};
 
 // Helper: git pull --rebase on local repo to sync with remote
 const pullLocalRepo = async (branch) => {
@@ -236,13 +217,10 @@ app.put('/api/agent/:name', async (req, res) => {
 
     const result = await response.json();
 
-    // 3. SYNC LOCAL: Download updated file to ~/.kiro/agents/
-    const localPath = await syncFileToLocal(filePath, branch);
-
-    // 4. GIT PULL: Sync local repo with remote
+    // 3. GIT PULL: Sync local repo with remote
     const { warning: pullWarning } = await pullLocalRepo(branch);
 
-    res.json({ success: true, sha: result.content.sha, commit: result.commit.sha, synced: localPath, warning: pullWarning });
+    res.json({ success: true, sha: result.content.sha, commit: result.commit.sha, warning: pullWarning });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -723,7 +701,6 @@ app.post('/api/apply-remote-config', async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    await syncFileToLocal(filePath, branch);
     const { warning: pullWarning } = await pullLocalRepo(branch);
 
     res.json({ success: true, changed });
@@ -774,7 +751,6 @@ app.post('/api/restore-local-config', async (req, res) => {
       return res.status(500).json({ error: err.message });
     }
 
-    await syncFileToLocal(filePath, branch);
     const { warning: pullWarning } = await pullLocalRepo(branch);
 
     res.json({ success: true, changed });
@@ -864,8 +840,6 @@ app.post('/api/move-server', async (req, res) => {
     }
 
     // 3. SYNC LOCAL
-    await syncFileToLocal(destPath, branch);
-    if (mode === 'move') await syncFileToLocal(srcPath, branch);
 
     // 4. GIT PULL: sync local repo
     const { warning: pullWarning } = await pullLocalRepo(branch);
