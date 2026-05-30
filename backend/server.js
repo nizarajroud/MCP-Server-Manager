@@ -139,6 +139,7 @@ app.get('/api/agents', async (req, res) => {
     const agents = files
       .filter(f => f.name.endsWith('.json') && !f.name.includes('example'))
       .map(f => ({ name: f.name.replace('.json', ''), path: f.path, sha: f.sha }));
+    agents.unshift({ name: 'Commun', path: 'settings/mcp.json', sha: null });
     res.json(agents);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -149,8 +150,8 @@ app.get('/api/agents', async (req, res) => {
 app.get('/api/agent/:name', async (req, res) => {
   try {
     const branch = req.query.branch || 'main';
-    
-    const response = await githubFetch(`/contents/agents/${req.params.name}.json?ref=${branch}`);
+    const filePath = req.params.name === 'Commun' ? 'settings/mcp.json' : `agents/${req.params.name}.json`;
+    const response = await githubFetch(`/contents/${filePath}?ref=${branch}`);
     const file = await response.json();
     const content = JSON.parse(Buffer.from(file.content, 'base64').toString('utf-8'));
     res.json({ content, sha: file.sha });
@@ -201,7 +202,7 @@ app.put('/api/agent/:name', async (req, res) => {
     }
 
     // Déterminer le chemin selon l'agent
-    const filePath = `agents/${req.params.name}.json`;
+    const filePath = req.params.name === 'Commun' ? 'settings/mcp.json' : `agents/${req.params.name}.json`;
     const commitMessage = message || `feat: update ${req.params.name} config`;
 
     // 1. REBASE: Fetch latest SHA (pull latest)
