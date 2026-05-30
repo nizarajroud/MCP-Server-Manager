@@ -105,6 +105,20 @@ app.put('/api/categories', async (req, res) => {
   }
 });
 
+// GET /api/common-servers?branch= — Get common MCP servers from settings/mcp.json
+app.get('/api/common-servers', async (req, res) => {
+  try {
+    const branch = req.query.branch || LOCAL_BRANCH;
+    const response = await githubFetch(`/contents/settings/mcp.json?ref=${branch}`);
+    if (!response.ok) return res.json({});
+    const file = await response.json();
+    const content = JSON.parse(Buffer.from(file.content, 'base64').toString('utf-8'));
+    res.json(content.mcpServers || {});
+  } catch (e) {
+    res.json({});
+  }
+});
+
 // GET /api/branches — List branches
 app.get('/api/branches', async (req, res) => {
   try {

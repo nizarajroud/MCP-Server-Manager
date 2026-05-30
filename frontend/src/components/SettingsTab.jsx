@@ -1,11 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { api } from '../lib/api';
+
+const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
 const SettingsTab = ({ categories, setCategories, selectedBranch, showNotification }) => {
   const [newName, setNewName] = useState('');
   const [editingKey, setEditingKey] = useState(null);
   const [editValue, setEditValue] = useState('');
+  const [commonServers, setCommonServers] = useState({});
+
+  useEffect(() => { loadCommonServers(); }, [selectedBranch]);
+
+  const loadCommonServers = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/common-servers?branch=${selectedBranch}`);
+      if (res.ok) setCommonServers(await res.json());
+    } catch (e) {}
+  };
 
   const saveCategories = async (updated, message) => {
     setCategories(updated);
@@ -70,6 +82,20 @@ const SettingsTab = ({ categories, setCategories, selectedBranch, showNotificati
         <button onClick={addCategory} disabled={!newName.trim()} className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg transition flex items-center gap-2 disabled:opacity-50">
           <Plus size={18} /> Ajouter
         </button>
+      </div>
+
+      <div className="mt-8 pt-6 border-t border-slate-700">
+        <h2 className="text-lg font-semibold mb-4">🌍 Serveurs communs (hérités par tous les agents)</h2>
+        <div className="space-y-2">
+          {Object.keys(commonServers).map(name => (
+            <div key={name} className="flex items-center gap-2 bg-slate-700/50 p-3 rounded-lg border border-slate-600">
+              <span className="flex-1">{name}</span>
+              <span className="text-xs text-slate-400">{commonServers[name].disabled ? '🔴 désactivé' : '🟢 actif'}</span>
+            </div>
+          ))}
+          {Object.keys(commonServers).length === 0 && <p className="text-slate-400 text-sm">Aucun serveur commun configuré.</p>}
+        </div>
+        <p className="text-xs text-slate-500 mt-3">Définis dans settings/mcp.json — chargés automatiquement par Kiro pour tous les agents.</p>
       </div>
     </div>
   );
