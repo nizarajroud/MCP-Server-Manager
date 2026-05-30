@@ -227,7 +227,7 @@ return (
       <span onClick={(e) => toggleFilter('actifs', e)} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('actifs') ? 'bg-green-600 text-white ring-2 ring-green-400' : 'bg-green-900/50 text-green-300 hover:bg-green-800/50'}`}>✓ {totalEnabled}</span>
       <span onClick={(e) => toggleFilter('disabled', e)} className={`px-2 py-0.5 rounded cursor-pointer transition ${activeFilters.has('disabled') ? 'bg-red-600 text-white ring-2 ring-red-400' : 'bg-red-900/50 text-red-300 hover:bg-red-800/50'}`}>✗ {allServers.length - totalEnabled}</span>
     </div>
-    <span onClick={(e) => toggleFilter('heavy', e)} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('heavy') ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.entries(resources).filter(([n, r]) => r.weight === 'heavy' && (!registry[n] || registry[n].target === 'local')).length}</strong></span>
+    <span onClick={(e) => toggleFilter('heavy', e)} className={`px-2 py-1 rounded cursor-pointer transition ${activeFilters.has('heavy') ? 'bg-orange-600 text-white ring-2 ring-orange-400' : 'bg-orange-900/50 text-orange-300 hover:bg-orange-800/50'}`}>🔥 Heavy: <strong>{Object.entries(resources).filter(([n, r]) => r.weight === 'heavy' && allServers.includes(n) && (!registry[n] || registry[n].target === 'local')).length}</strong></span>
   </div>
 
   {/* Zone 2 — Recherche + Vue + Refresh */}
